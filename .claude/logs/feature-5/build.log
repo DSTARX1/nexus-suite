@@ -4631,3 +4631,30 @@ Chunk 2 complete. Typecheck passes clean. Summary of what was built:
 [0;32m✓ Chunk 2 done[0m
 [0;36m  Quality gate after chunk 2...[0m
 [0;32m  ✓ Passed[0m
+[r3lamp4go/feature-5 44a2adb6] checkpoint: chunk 2 — yt-dlp download wrapper + FFmpeg 4-layer pipeline
+ 8 files changed, 5015 insertions(+), 12 deletions(-)
+ create mode 100644 .claude/logs/chunk-2.log
+ create mode 100644 .claude/logs/gate-2.log
+ create mode 100644 services/media-engine/src/download.ts
+ create mode 100644 services/media-engine/src/ffmpeg.ts
+ create mode 100644 services/media-engine/src/transforms.ts
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/19
+[0;32m  ✓ Issue #19: Chunk 2 checked off[0m
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1;33m▶ Chunk 3/3: Audio safety + combination engine + verification[0m  Log: /Users/imorgado/nexus-suite/.claude/worktrees/feature-5/.claude/logs/chunk-3.log
+All 3 chunks done. Here's the summary:
+
+**Chunk 3/3 complete — Audio safety + combination engine + verification**
+
+**Files created:**
+- `services/media-engine/src/audio-safety.ts` — ebur128 loudness + silence detection heuristic (music = low silence ratio + high loudness range + >-40 LUFS). If music detected: strips audio, injects silent placeholder via `anullsrc`
+- `services/media-engine/src/combinator.ts` — pools of visual (8 transforms) + audio (4 transforms) + structural params. `generateVariationCombos(n)` picks 2-3 visual + 1-2 audio per variation, deduplicates by combo key. `regenerateCombo()` for collision recovery
+- `services/media-engine/src/verify.ts` — DCT-based video pHash (32x32 grayscale → 8x8 block means → 64-bit hash). Chromaprint fingerprint via `fpcalc` with FFmpeg fallback. Hamming distance check with min threshold 5. `detectCollisions()` + `getCollisionIndices()` for regeneration targeting
+
+**Typecheck:** clean
+
+**CLAUDE.md updated:** `build - Chunk 3/3 done - #19`
+[0;32m✓ Chunk 3 done[0m
+[0;36m  Quality gate after chunk 3...[0m
+[0;32m  ✓ Passed[0m
