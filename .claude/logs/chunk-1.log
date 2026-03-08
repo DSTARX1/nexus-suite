@@ -1,14 +1,3 @@
-<<<<<<< HEAD
-Chunk 1 done. Created:
+Chunk 1 done. `getWorkflowStats` now queries `PostRecord.groupBy({ by: ['status'] })` and maps `POSTING→active`, `SUCCESS→completed`, `FAILED→failed`, `SCHEDULED→queued`. TypeCheck passes clean.
 
-- **`src/server/api/routers/pricing.ts`** — `pricingRouter` with `createCheckoutSession` mutation using `authedProcedure`, takes `{ tier: "PRO" | "MULTIPLIER" | "ENTERPRISE" }`, creates Stripe checkout session with setup + subscription line items, returns `{ url }`
-- **`src/server/api/root.ts`** — registered `pricing: pricingRouter`
-
-TypeScript: 0 errors.
-
-Phase 1 done. Resume: `gh issue view 45`, execute Chunk 2. Files: `src/server/api/routers/pricing.ts`, `src/server/api/root.ts`. Issues: none.
-=======
-Chunk 1 done. Created `src/app/suspended/page.tsx` — static server component with centered card layout (matching onboarding pattern), "Account Suspended" message, and mailto support link. Typecheck passes clean.
-
-Phase 1 done. Resume: `gh issue view 46`, execute Chunk 2. Files: `src/app/suspended/page.tsx`. Issues: none.
->>>>>>> feature-31
+Phase 1 done. Resume: `gh issue view 47`, execute Chunk 2. Files: `src/server/api/routers/dashboard.ts`. Issues: none.
