@@ -1,17 +1,24 @@
-Chunk 3/3 done. Summary of changes:
+## Chunk 3: Create content-repurpose.yaml
 
-**New handlers:**
-- `analytics-sync.ts` — resolves platform account, fetches credentials via Infisical fetch-use-discard, calls platform analytics API. Storage deferred until `AnalyticsMetric` model lands.
-- `webhook-dispatch.ts` — POSTs payload with exponential backoff (3 retries, 1s base), 10s timeout per attempt.
+### Files changed
+- `src/server/workflows/content-repurpose.yaml` (created)
+- `CLAUDE.md` (updated phase line)
 
-**Wiring:**
-- `jobs/index.ts` — registered both new handlers, kept `MEDIA_PROCESS` as lone stub.
+### What was built
+Manually-triggered workflow: content-repurposer → forEach(targetPlatforms, maxConcurrency:3) { variation-orchestrator → content.schedule }
 
-**BullMQ cleanup:**
-- `worker/index.ts` — removed `Worker` import, `bullWorkers` array, orphaned `"default"` queue worker, `REDIS_URL` check, and BullMQ close loop.
+- Step 1: `analyze-source` — agent-delegate to content-repurposer, analyzes source content
+- Step 2: `per-platform` — forEach over targetPlatforms with maxConcurrency 3
+  - `generate-variation` — agent-delegate to variation-orchestrator, platform-specific adaptation
+  - `schedule-variation` — action content.schedule, schedules each variation
 
-**Typecheck:** clean (`tsc --noEmit` passes).
-queue worker, REDIS_URL check, BullMQ close loop
+### Validator compliance
+- Layer 3: unique step IDs ✓
+- Layer 4: dependsOn refs valid (per-platform → analyze-source, schedule-variation → generate-variation) ✓
+- Layer 5: no circular deps ✓
+- Layer 6: var refs trace to input.* or outputAs ✓
+- Layer 7: agent-delegate prompts non-empty ✓
+- Layer 9: forEach has maxConcurrency ✓
 
-### Typecheck
-- tsc --noEmit: PASS (fixed fetchSecret 4-arg signature)
+### TypeScript
+- `npx tsc --noEmit` — clean, no errors

@@ -1,0 +1,89 @@
+# Daily Content Pipeline
+# Chains: trend-scout → script-agent → caption-writer → quality-scorer → schedule
+# Runs daily at 6 AM UTC. Skips scheduling if quality score < 7.
+
+name: daily-pipeline
+description: "Daily content pipeline: discover trends, generate script, write caption, score quality, schedule post"
+organizationId: "{{input.organizationId}}"
+trigger:
+  type: cron
+  schedule: "0 6 * * *"
+config:
+  platform: "{{input.platform}}"
+  niche: "{{input.niche}}"
+input:
+  organizationId: "Organization ID"
+  platform: "Target platform (TIKTOK, INSTAGRAM, YOUTUBE, etc.)"
+  niche: "Content niche for trend discovery"
+
+steps:
+  # ── Step 1: Discover trending topics ────────────────────────────
+  - id: discover-trends
+    type: agent-delegate
+    agent: trend-scout
+    prompt: "Find trending topics in the {{input.niche}} niche on {{input.platform}}. Return the top trend with title, angle, and talking points."
+    outputAs: trends
+    retries: 2
+    timeoutMs: 60000
+
+  # ── Step 2: Generate script from trend ──────────────────────────
+  - id: generate-script
+    type: agent-delegate
+    agent: script-agent
+    prompt: "Write a short-form script for {{input.platform}} based on this trend: {{trends}}. Target 60-90 seconds. Include hook, body, and CTA."
+    dependsOn:
+      - discover-trends
+    outputAs: script
+    retries: 2
+    timeoutMs: 90000
+
+  # ── Step 3: Write caption and hashtags ──────────────────────────
+  - id: write-caption
+    type: agent-delegate
+    agent: caption-writer
+    prompt: "Write a caption for this {{input.platform}} post. Script: {{script}}. Include relevant hashtags and a call-to-action."
+    dependsOn:
+      - generate-script
+    outputAs: caption
+    retries: 1
+    timeoutMs: 60000
+
+  # ── Step 4: Score content quality ───────────────────────────────
+  - id: score-quality
+    type: agent-delegate
+    agent: quality-scorer
+    prompt: "Score this content 1-10 for {{input.platform}}. Script: {{script}}. Caption: {{caption}}. Return a JSON object with a numeric 'score' field and 'feedback' field."
+    dependsOn:
+      - write-caption
+    outputAs: quality
+    retries: 1
+    timeoutMs: 30000
+
+  # ── Step 5: Gate on quality score ───────────────────────────────
+  - id: quality-gate
+    type: condition
+    condition: "{{quality.score}} >= 7"
+    dependsOn:
+      - score-quality
+    onTrue:
+      - id: schedule-post
+        type: action
+        action: content.schedule
+        params:
+          organizationId: "{{input.organizationId}}"
+          platform: "{{input.platform}}"
+          script: "{{script}}"
+          caption: "{{caption}}"
+          qualityScore: "{{quality.score}}"
+        retries: 2
+        timeoutMs: 30000
+    onFalse:
+      - id: log-low-quality
+        type: action
+        action: content.logSkipped
+        params:
+          organizationId: "{{input.organizationId}}"
+          reason: "Quality score {{quality.score}} below threshold (7)"
+          feedback: "{{quality.feedback}}"
+        retries: 1
+        timeoutMs: 15000

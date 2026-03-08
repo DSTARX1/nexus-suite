@@ -1,0 +1,53 @@
+# Content Repurpose
+# Chains: content-repurposer → forEach(targetPlatforms) { variation-orchestrator → schedule }
+# Manually triggered. Repurposes source content across multiple platforms.
+
+name: content-repurpose
+description: "Content repurpose: analyze source content, generate platform-specific variations, schedule each"
+organizationId: "{{input.organizationId}}"
+trigger:
+  type: manual
+input:
+  organizationId: "Organization ID"
+  sourceContentId: "ID of the source content to repurpose"
+  targetPlatforms: "Array of target platforms (e.g. TIKTOK, INSTAGRAM, YOUTUBE)"
+
+steps:
+  # ── Step 1: Analyze source content ─────────────────────────────────
+  - id: analyze-source
+    type: agent-delegate
+    agent: content-repurposer
+    prompt: "Analyze source content {{input.sourceContentId}} for organization {{input.organizationId}}. Extract key themes, hooks, talking points, and media assets. Return a structured breakdown suitable for adapting to multiple platforms."
+    outputAs: sourceAnalysis
+    retries: 2
+    timeoutMs: 60000
+
+  # ── Step 2: Generate variations per platform and schedule ──────────
+  - id: per-platform
+    type: forEach
+    collection: "{{input.targetPlatforms}}"
+    as: platform
+    maxConcurrency: 3
+    dependsOn:
+      - analyze-source
+    steps:
+      - id: generate-variation
+        type: agent-delegate
+        agent: variation-orchestrator
+        prompt: "Generate a {{platform}}-optimized variation of this content: {{sourceAnalysis}}. Adapt format, length, tone, and hooks for {{platform}} best practices. Return the variation with script, caption, and hashtags."
+        outputAs: variation
+        retries: 2
+        timeoutMs: 90000
+
+      - id: schedule-variation
+        type: action
+        action: content.schedule
+        dependsOn:
+          - generate-variation
+        params:
+          organizationId: "{{input.organizationId}}"
+          platform: "{{platform}}"
+          sourceContentId: "{{input.sourceContentId}}"
+          variation: "{{variation}}"
+        retries: 2
+        timeoutMs: 30000

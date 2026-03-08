@@ -1,13 +1,8 @@
-Chunk 2 done. Summary:
+Chunk 2 done. Created `src/server/workflows/engagement-sweep.yaml` with:
 
-**Created:**
-- `src/server/worker/jobs/handlers/scraper-run.ts` — forwards job to `scrape:task` pg-boss queue with `taskId`, `url`, `options` matching scraper-pool's `ScrapeTask` interface
-- `src/server/worker/jobs/handlers/agent-execute.ts` — calls `executeAgentDelegate()` with proper `WorkflowContext`, extracts prompt from input
+- **Cron trigger**: `0 */4 * * *` (every 4h)
+- **Step 1**: `analytics-reporter` agent collects engagement data
+- **Step 2**: `condition` gate on `actionableCount >= 1` — runs `engagement-responder` on true, logs skip on false
+- **Step 3**: `engagement.compileReport` action compiles final report
 
-**Modified:**
-- `src/server/worker/jobs/index.ts` — wired `SCRAPER_RUN` + `AGENT_EXECUTE` with dedicated handlers, removed from stub loop
-- `CLAUDE.md` — phase updated to chunk 2/3 done
-
-Typecheck passes clean. Continuation:
-
-`Phase 2 done. Resume: gh issue view 76, execute chunk 3. Files: src/server/worker/jobs/index.ts, handlers/scraper-run.ts, handlers/agent-execute.ts. Issues: none`
+All validator layers satisfied: unique IDs, valid `dependsOn` refs, no cycles, `{{var}}` refs trace to `input.*`/`outputAs`, agent-delegate steps have non-empty prompts. Type-check passes clean.

@@ -1,9 +1,11 @@
-Chunk 1 done. Typecheck passes.
+Chunk 1 done. Created `src/server/workflows/daily-pipeline.yaml` with:
 
-**What was built:**
+- **Cron trigger**: `0 6 * * *` (daily 6 AM UTC)
+- **Inputs**: `organizationId`, `platform`, `niche`
+- **5-step chain**: `trend-scout` → `script-agent` → `caption-writer` → `quality-scorer` → condition gate
+- **`dependsOn`** chaining between all steps, **`outputAs`** to pass data forward
+- **Quality gate**: `condition` step checks `{{quality.score}} >= 7` — schedules on true, logs skip on false
 
-- **`handlers/content-publish.ts`** — resolves `contentId` → SourceVideo + ready variations, finds eligible accounts by `platformIds` (excluding OPEN circuit), creates PostRecord per account, calls `postContent()` immediately
-- **`handlers/content-schedule.ts`** — same content/account resolution, but creates PostRecord with future `scheduledAt` and enqueues `post:task` via `boss.send()` with `startAfter` (same pattern as distribution-scheduler)
-- **`jobs/index.ts`** — replaced generic loop with specific handler dispatch for CONTENT_PUBLISH and CONTENT_SCHEDULE; remaining 5 job types stay stubbed
+TypeScript passes clean. CLAUDE.md updated.
 
-Phase 1 done. Resume: `gh issue view 76`, execute Chunk 2. Files: `src/server/worker/jobs/index.ts`, `src/server/worker/jobs/handlers/content-publish.ts`, `src/server/worker/jobs/handlers/content-schedule.ts`. Issues: none.
+Phase 1 done. Resume: `gh issue view 77`, execute Chunk 2. Files: `src/server/workflows/daily-pipeline.yaml`. Issues: none.

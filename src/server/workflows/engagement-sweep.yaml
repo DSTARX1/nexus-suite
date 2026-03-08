@@ -1,0 +1,64 @@
+# Engagement Sweep
+# Chains: analytics-reporter → engagement-responder → compile report
+# Runs every 4 hours. Skips engagement-responder if no actionable items.
+
+name: engagement-sweep
+description: "Engagement sweep: analyze metrics, respond to actionable items, compile report"
+organizationId: "{{input.organizationId}}"
+trigger:
+  type: cron
+  schedule: "0 */4 * * *"
+config:
+  platform: "{{input.platform}}"
+input:
+  organizationId: "Organization ID"
+  platform: "Target platform (TIKTOK, INSTAGRAM, YOUTUBE, etc.)"
+
+steps:
+  # ── Step 1: Collect engagement analytics ─────────────────────────
+  - id: collect-analytics
+    type: agent-delegate
+    agent: analytics-reporter
+    prompt: "Analyze engagement metrics for {{input.platform}} in organization {{input.organizationId}}. Return a summary with total interactions, top-performing posts, and a list of actionable items (comments needing replies, DMs, mentions). Include an 'actionableCount' field."
+    outputAs: analytics
+    retries: 2
+    timeoutMs: 60000
+
+  # ── Step 2: Gate on actionable items ─────────────────────────────
+  - id: actionable-gate
+    type: condition
+    condition: "{{analytics.actionableCount}} >= 1"
+    dependsOn:
+      - collect-analytics
+    onTrue:
+      - id: respond-engagement
+        type: agent-delegate
+        agent: engagement-responder
+        prompt: "Process these actionable engagement items for {{input.platform}}: {{analytics}}. Reply to comments, acknowledge mentions, and handle DMs. Return a summary of actions taken."
+        outputAs: responses
+        retries: 2
+        timeoutMs: 90000
+    onFalse:
+      - id: log-no-actions
+        type: action
+        action: engagement.logSkipped
+        params:
+          organizationId: "{{input.organizationId}}"
+          platform: "{{input.platform}}"
+          reason: "No actionable engagement items found"
+        retries: 1
+        timeoutMs: 15000
+
+  # ── Step 3: Compile report ───────────────────────────────────────
+  - id: compile-report
+    type: action
+    action: engagement.compileReport
+    dependsOn:
+      - actionable-gate
+    params:
+      organizationId: "{{input.organizationId}}"
+      platform: "{{input.platform}}"
+      analytics: "{{analytics}}"
+      responses: "{{responses}}"
+    retries: 1
+    timeoutMs: 30000
