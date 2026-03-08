@@ -72,10 +72,32 @@ const SUBMIT_SELECTORS: Record<string, string[]> = {
   ],
 };
 
+// Selectors that hint the challenge is email-based
+const EMAIL_HINT_SELECTORS: string[] = [
+  'text="check your email"',
+  'text="sent to your email"',
+  'text="sent a code to your email"',
+  'text="email verification"',
+  'text="Check your inbox"',
+];
+
+// Selectors that hint the challenge is SMS-based
+const SMS_HINT_SELECTORS: string[] = [
+  'text="sent to your phone"',
+  'text="SMS"',
+  'text="text message"',
+  'text="check your phone"',
+  'text="sent a code to your phone"',
+  'text="mobile number"',
+];
+
+export type VerificationType = "email" | "sms" | "unknown";
+
 export interface DetectionResult {
   detected: boolean;
   platform: string;
   matchedSelector?: string;
+  verificationType?: VerificationType;
 }
 
 /**
@@ -91,7 +113,8 @@ export async function detectVerification(
     try {
       const el = await page.$(selector);
       if (el) {
-        return { detected: true, platform, matchedSelector: selector };
+        const verificationType = await classifyVerificationType(page);
+        return { detected: true, platform, matchedSelector: selector, verificationType };
       }
     } catch {
       // selector didn't match, continue
@@ -99,6 +122,31 @@ export async function detectVerification(
   }
 
   return { detected: false, platform };
+}
+
+/**
+ * After detecting a challenge, check hint selectors to classify as email or SMS.
+ */
+async function classifyVerificationType(page: Page): Promise<VerificationType> {
+  for (const selector of EMAIL_HINT_SELECTORS) {
+    try {
+      const el = await page.$(selector);
+      if (el) return "email";
+    } catch {
+      // continue
+    }
+  }
+
+  for (const selector of SMS_HINT_SELECTORS) {
+    try {
+      const el = await page.$(selector);
+      if (el) return "sms";
+    } catch {
+      // continue
+    }
+  }
+
+  return "unknown";
 }
 
 /**

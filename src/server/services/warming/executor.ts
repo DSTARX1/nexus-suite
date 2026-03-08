@@ -8,28 +8,38 @@
 import type { Page } from "patchright";
 import { type AccountContext, loadAccountContext, launchBrowser, persistSession } from "../browser-helpers";
 import { humanPause, humanScroll, humanClick, scrollFeed, watchVideo, humanType } from "./human-behavior";
-import { detectVerification, handleVerification } from "./verification/detector";
+import { detectVerification, handleVerification, type VerificationType } from "./verification/detector";
 import { createVerificationProvider, type VerificationCodeProvider } from "./verification/provider";
+import { recordVerification } from "./health-tracker";
 import type { WarmTask } from "./queue";
 
-// ── Verification Check ────────────────────────────────────────────
+// ── Verification Providers (per-type) ─────────────────────────────
 
-let verificationProvider: VerificationCodeProvider | null = null;
+const providers: Record<string, VerificationCodeProvider> = {};
 
-async function getVerificationProvider(): Promise<VerificationCodeProvider> {
-  if (!verificationProvider) {
-    verificationProvider = await createVerificationProvider();
+async function getProviderForType(vType: VerificationType): Promise<VerificationCodeProvider> {
+  const key = vType === "email" ? "imap" : "sms";
+  if (!providers[key]) {
+    providers[key] = await createVerificationProvider(key === "imap" ? "imap" : undefined);
   }
-  return verificationProvider;
+  return providers[key];
 }
 
 async function checkAndHandleVerification(page: Page, ctx: AccountContext): Promise<boolean> {
   const detection = await detectVerification(page, ctx.platform.toLowerCase());
   if (!detection.detected) return false;
 
-  console.log(`[executor] Verification challenge detected for ${ctx.accountLabel}`);
-  const provider = await getVerificationProvider();
-  return handleVerification(page, provider, ctx.accountLabel, ctx.platform.toLowerCase());
+  const vType = detection.verificationType ?? "unknown";
+  console.log(`[executor] Verification challenge detected for ${ctx.accountLabel} (type: ${vType})`);
+
+  // Pick provider + identifier based on verification type
+  const resolvedType: VerificationType = vType === "unknown" ? (ctx.email ? "email" : "sms") : vType;
+  const provider = await getProviderForType(resolvedType);
+  const identifier = resolvedType === "email" ? (ctx.email ?? ctx.accountLabel) : ctx.platform.toLowerCase();
+
+  const success = await handleVerification(page, provider, identifier, ctx.platform.toLowerCase());
+  await recordVerification(ctx.accountId, success);
+  return success;
 }
 
 // ── Action Handlers ───────────────────────────────────────────────
@@ -47,9 +57,9 @@ const actions: Record<string, ActionFn> = {
     await humanPause(2000, 4000);
     await checkAndHandleVerification(page, ctx);
 
-    // Scroll feed for 2-5 minutes
+    // Scroll feed for 2-5 minutes, re-check verification every ~30s
     const durationMs = (2 + Math.random() * 3) * 60_000;
-    await scrollFeed(page, durationMs);
+    await scrollFeed(page, durationMs, () => checkAndHandleVerification(page, ctx).then(() => {}));
   },
 
   "watch-video": async (page, ctx) => {
@@ -62,8 +72,8 @@ const actions: Record<string, ActionFn> = {
     await humanPause(2000, 4000);
     await checkAndHandleVerification(page, ctx);
 
-    // Watch 30s-3min per video
-    await watchVideo(page, 30, 180);
+    // Watch 30s-3min per video, re-check verification every ~30s
+    await watchVideo(page, 30, 180, () => checkAndHandleVerification(page, ctx).then(() => {}));
   },
 
   "like-post": async (page, ctx) => {
@@ -205,10 +215,10 @@ export async function executeWarmTask(task: WarmTask): Promise<void> {
   }
 }
 
-/** Dispose global resources (verification provider) */
+/** Dispose global resources (verification providers) */
 export async function disposeExecutor(): Promise<void> {
-  if (verificationProvider) {
-    await verificationProvider.dispose();
-    verificationProvider = null;
+  for (const [key, provider] of Object.entries(providers)) {
+    await provider.dispose();
+    delete providers[key];
   }
 }

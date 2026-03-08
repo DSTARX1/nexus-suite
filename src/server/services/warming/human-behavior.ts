@@ -141,8 +141,13 @@ export async function humanScroll(
 /**
  * Scroll through feed content for a specified duration.
  */
-export async function scrollFeed(page: Page, durationMs: number): Promise<void> {
+export async function scrollFeed(
+  page: Page,
+  durationMs: number,
+  onTick?: () => Promise<void>,
+): Promise<void> {
   const start = Date.now();
+  let lastCheck = start;
 
   while (Date.now() - start < durationMs) {
     // Scroll down a random amount
@@ -155,6 +160,12 @@ export async function scrollFeed(page: Page, durationMs: number): Promise<void> 
     if (Math.random() < 0.1) {
       await humanScroll(page, randInt(50, 150), "up");
       await humanPause(500, 1500);
+    }
+
+    // Periodic callback (~30s interval)
+    if (onTick && Date.now() - lastCheck >= 30_000) {
+      await onTick();
+      lastCheck = Date.now();
     }
   }
 }
@@ -194,9 +205,15 @@ export async function humanType(page: Page, selector: string, text: string): Pro
 /**
  * Watch a video for a randomized duration, with occasional mouse movements.
  */
-export async function watchVideo(page: Page, minSec: number, maxSec: number): Promise<void> {
+export async function watchVideo(
+  page: Page,
+  minSec: number,
+  maxSec: number,
+  onTick?: () => Promise<void>,
+): Promise<void> {
   const watchTimeMs = rand(minSec * 1000, maxSec * 1000);
   const start = Date.now();
+  let lastCheck = start;
 
   while (Date.now() - start < watchTimeMs) {
     // Idle for a while
@@ -212,6 +229,12 @@ export async function watchVideo(page: Page, minSec: number, maxSec: number): Pr
           randInt(viewport.height * 0.3, viewport.height * 0.7),
         );
       }
+    }
+
+    // Periodic callback (~30s interval)
+    if (onTick && Date.now() - lastCheck >= 30_000) {
+      await onTick();
+      lastCheck = Date.now();
     }
   }
 }

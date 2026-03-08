@@ -9,14 +9,21 @@ interface HealthEntry {
   lastActionAt: string; // ISO timestamp
   actionCount: number;
   phase: number; // current warming phase (1-4)
+  verificationCount: number;
+  lastVerifiedAt: string | null;
+  verificationFailures: number;
 }
 
 export async function recordAction(accountId: string, phase: number): Promise<void> {
   const key = `${HEALTH_PREFIX}${accountId}`;
+  const existing = await getHealth(accountId);
   const entry: HealthEntry = {
     lastActionAt: new Date().toISOString(),
-    actionCount: await getActionCount(accountId) + 1,
+    actionCount: (existing?.actionCount ?? 0) + 1,
     phase,
+    verificationCount: existing?.verificationCount ?? 0,
+    lastVerifiedAt: existing?.lastVerifiedAt ?? null,
+    verificationFailures: existing?.verificationFailures ?? 0,
   };
   // TTL 30 days — auto-cleanup for abandoned accounts
   await redis.set(key, JSON.stringify(entry), "EX", 30 * 86400);
@@ -50,9 +57,18 @@ export async function clearStale(accountId: string): Promise<void> {
   await redis.del(`${HEALTH_PREFIX}${accountId}:stale`);
 }
 
-async function getActionCount(accountId: string): Promise<number> {
-  const health = await getHealth(accountId);
-  return health?.actionCount ?? 0;
+export async function recordVerification(accountId: string, success: boolean): Promise<void> {
+  const key = `${HEALTH_PREFIX}${accountId}`;
+  const existing = await getHealth(accountId);
+  const entry: HealthEntry = {
+    lastActionAt: existing?.lastActionAt ?? new Date().toISOString(),
+    actionCount: existing?.actionCount ?? 0,
+    phase: existing?.phase ?? 1,
+    verificationCount: (existing?.verificationCount ?? 0) + 1,
+    lastVerifiedAt: new Date().toISOString(),
+    verificationFailures: (existing?.verificationFailures ?? 0) + (success ? 0 : 1),
+  };
+  await redis.set(key, JSON.stringify(entry), "EX", 30 * 86400);
 }
 
 export { redis as warmingRedis };

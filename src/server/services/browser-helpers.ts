@@ -20,6 +20,7 @@ export interface AccountContext {
   organizationId: string;
   platform: string;
   accountLabel: string;
+  email: string | null;
   proxyUrl: string | null;
   fingerprint: {
     userAgent: string;
@@ -61,6 +62,7 @@ export async function loadAccountContext(accountId: string): Promise<AccountCont
     organizationId: account.organizationId,
     platform: account.platform,
     accountLabel: account.accountLabel,
+    email: (account as Record<string, unknown>).email as string | null ?? null,
     proxyUrl,
     fingerprint: fp
       ? {
