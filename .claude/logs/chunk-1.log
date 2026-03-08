@@ -1,22 +1,9 @@
-<<<<<<< HEAD
-Chunk 1 done. Created `src/server/services/platform-apis/meta.ts` with:
+Chunk 1 done. Created `src/server/services/platform-apis/linkedin.ts` with:
 
-1. **`MetaAuthConfig`** type — access token, page ID, IG user ID
-2. **`getMetaAuth()`** — parallel `fetchSecret()` calls for all 3 Meta secrets (fetch-use-discard)
-3. **`isMockMode()`** — reads `MOCK_PLATFORM_APIS` env var
-4. **`getVideoUrl()`** — delegates to `getSignedUrl()` from r2-storage
-5. **`mockPostResult()`** — returns fake success with synthetic UUID
-
-Typecheck passes clean. Phase line updated in CLAUDE.md.
-
-Phase 1 done. Resume: `gh issue view 52`, execute Chunk 2. Files: `src/server/services/platform-apis/meta.ts`, `src/server/services/posting.ts`. Issues: none.
-=======
-Chunk 1 done. Typecheck passes.
-
-**What was done:**
-- Created `src/server/services/browser-helpers.ts` — extracted `AccountContext` interface, `loadAccountContext()`, `launchBrowser()`, `persistSession()` from `warming/executor.ts`
-- Updated `warming/executor.ts` — removed ~130 lines of duplicated code, now imports from shared module
-- Same deps: patchright, Prisma, Infisical, session-manager
-
-Phase 1 done. Resume: `gh issue view 50`, execute Chunk 2. Files: `src/server/services/browser-helpers.ts`, `src/server/services/warming/executor.ts`. Issues: none.
->>>>>>> r3lamp4go/feature-35
+- **Mock mode**: returns `mock_linkedin_{uuid}` when `MOCK_PLATFORM_APIS=true`
+- **3-step LinkedIn Marketing API flow**:
+  1. Register upload → gets asset URN + upload URL
+  2. PUT binary to upload URL with `application/octet-stream`
+  3. POST `/v2/ugcPosts` with asset, caption as commentary, visibility PUBLIC
+- **Signature**: `postLinkedInApi(accessToken, variation)` — matches YouTube/TikTok pattern
+- Typecheck passes clean
