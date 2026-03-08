@@ -2,7 +2,33 @@
 // Formats content for Instagram Stories with interactive elements.
 
 import { Agent } from "@mastra/core/agent";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { wrapToolHandler } from "@/agents/general";
 import { modelConfig } from "@/agents/platforms/model-config";
+
+const formatStorySequence = createTool({
+  id: "formatStorySequence",
+  description: "Generate an Instagram Story slide plan with interactive element recommendations",
+  inputSchema: z.object({
+    content: z.string().describe("Raw content to format into story slides"),
+    goal: z.string().optional().describe("Story goal (e.g. engagement, traffic, awareness)"),
+  }),
+  execute: async (executionContext) => {
+    const { content, goal } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { content: string; goal?: string }) => ({
+        content: input.content,
+        goal: input.goal ?? "engagement",
+        slides: [] as string[],
+        interactiveElements: [] as string[],
+        status: "pending-integration" as const,
+      }),
+      { agentName: "story-formatter", toolName: "formatStorySequence" },
+    );
+    return wrappedFn({ content, goal });
+  },
+});
 
 export const storyFormatterAgent = new Agent({
   name: "story-formatter",
@@ -23,4 +49,5 @@ Story sequence planning:
 
 Keep text minimal and readable. Use brand colors and fonts consistently.`,
   model: modelConfig.tier25,
+  tools: { formatStorySequence },
 });
