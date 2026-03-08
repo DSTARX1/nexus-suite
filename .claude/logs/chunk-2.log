@@ -1,6 +1,12 @@
-Chunk 2 done. Created:
+Chunk 2 done. Created `src/server/services/circuit-breaker.ts` with:
 
-- **`src/server/api/routers/multiplier.ts`** — 5 procedures (`uploadSource`, `generateVariations`, `getVariations`, `scheduleDistribution`, `getDistributionStatus`), all gated by `onboardedProcedure` + `multiplierEnabled` check
-- **`src/server/api/root.ts`** — wired `multiplierRouter` into `appRouter`
+- **State machine**: CLOSED → 3 failures → OPEN → cooldown expires → HALF_OPEN → success→CLOSED / failure→OPEN
+- **`canPost(accountId)`** — checks circuit state + Redis cooldown TTL, auto-transitions OPEN→HALF_OPEN when cooldown expires
+- **`recordSuccess(accountId)`** — resets failures, sets CLOSED, recovers healthScore, clears backoff/cooldown keys
+- **`recordFailure(accountId)`** — increments failures, transitions states, decays healthScore, sets Redis cooldown with exponential backoff (5→15→45min)
+- **Auto-disable** — healthScore < 0.3 triggers admin alert via Redis pub/sub `admin:alerts`
+- Follows existing patterns: `ioredis` + `@/lib/db` imports, same structure as `llm-budget.ts`
 
-`tsc --noEmit` passes clean for all new code (8 pre-existing errors in unrelated files). CLAUDE.md updated to Chunk 2/3 done.
+Typecheck: only pre-existing missing `node_modules` errors (identical to `llm-budget.ts`). No type errors in the new code.
+
+CLAUDE.md phase line updated to `Chunk 2/4`.

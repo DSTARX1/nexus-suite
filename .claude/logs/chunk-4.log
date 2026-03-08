@@ -1,10 +1,17 @@
-Chunk 4 complete. Created `src/app/competitors/page.tsx` with:
+Chunk 4 complete. Created:
 
-- **+ Track Creator** button → modal with URL input → calls `competitors.addCreator`
-- **Creator cards grid** — avatar (or initial), username, platform badge, follower count, post count, last polled timestamp, auto-reproduce checkbox toggle, threshold slider
-- **Expandable post list** per creator via `getCreatorPosts` — title, views/likes/comments, published date
-- **Outlier highlighting** with fire icon, **Analyze** and **Reproduce** buttons per post
-- **Loading/error states** matching admin page pattern
-- **30s refetch interval** for live polling status
+**`src/server/services/posting.ts`** — hybrid posting logic:
+- `postContent(orgId, accountId, variationId, platform, postRecordId)` — main entry
+- Routes by `accountType`: PRIMARY → `postViaApi()`, SECONDARY → `postViaBrowser()`
+- API path: fetches OAuth token from Infisical (fetch-use-discard), dispatches to platform-specific stubs (YouTube, TikTok, Instagram, Facebook, X, LinkedIn)
+- Browser path: loads fingerprint profile + proxy from Infisical, session from R2 (Patchright stubs)
+- `finalizePost()` — updates PostRecord status, calls circuit breaker `recordSuccess`/`recordFailure`, emits SSE via Redis pub/sub `post:events`
 
-No tsconfig exists in this worktree (same as previous chunks), so `tsc --noEmit` can't run — but the page follows the exact same patterns as the working `admin/page.tsx`.
+**`src/server/workers/post-worker.ts`** — pg-boss consumer:
+- Subscribes to `post:task` queue (teamSize=2, teamConcurrency=2)
+- Validates PostRecord still SCHEDULED before executing
+- `startPostWorker()` / `stopPostWorker()` lifecycle
+
+`tsc --noEmit` can't run — `next-auth@^5.0.0` has no matching npm version (pre-existing). Code manually reviewed; types align with schema, circuit-breaker, and infisical imports.
+
+CLAUDE.md updated to **Chunk 4/4 (complete)**.

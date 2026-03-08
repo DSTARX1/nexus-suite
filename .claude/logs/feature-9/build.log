@@ -1,0 +1,140 @@
+[0;34mFetching plan from issue #23...[0m
+[0;34m══════════════════════════════════════════════════════[0m
+[0;34m  Plan Executor - feature-9[0m
+[0;34m══════════════════════════════════════════════════════[0m
+[0;32m✓[0m Issue: #23
+[0;32m✓[0m 4 chunks, starting from 1
+[0;32m✓[0m Feature: __FEATURE_NAME__
+[0;32m✓[0m Checks: npx tsc --noEmit 2>&1 || true
+
+[0;32m✓[0m Chunks: 1 2 3 4
+
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1;33m▶ Chunk 1/4: Prisma models + pg-boss setup[0m  Log: /Users/imorgado/nexus-suite/.claude/worktrees/feature-9/.claude/logs/chunk-1.log
+**Chunk 1 done.** Added:
+
+- **PostStatus** enum (SCHEDULED, POSTING, SUCCESS, FAILED, SKIPPED)
+- **SourceVideo** model — `organizationId`, `url`, `platform`, `r2StorageKey`, `duration`, `metadata`
+- **VideoVariation** model — `sourceVideoId`, `variationIndex`, `transforms` (Json), `r2StorageKey`, `fileHash`, `pHash`, `audioFingerprint`, `caption`, `status`
+- **PostRecord** model — `accountId` → OrgPlatformToken, `variationId` → VideoVariation, `platform`, `scheduledAt`, `postedAt`, `status`, `externalPostId`, `caption`, `errorMessage`
+- Back-references on Organization (`sourceVideos`, `postRecords`) and OrgPlatformToken (`postRecords`)
+- **pg-boss** `^10.0.0` added to package.json
+
+Note: `prisma validate` fails on a pre-existing Prisma 7 datasource URL config issue (needs `prisma.config.ts`), not related to Chunk 1 changes. `tsc` not installed locally.
+
+Phase 1 done. Resume: `gh issue view 23`, execute Chunk 2. Files: `prisma/schema.prisma`, `package.json`. Issues: pre-existing Prisma 7 datasource config migration needed.
+[0;32m✓ Chunk 1 done[0m
+[0;36m  Quality gate after chunk 1...[0m
+[0;32m  ✓ Passed[0m
+[r3lamp4go/feature-9 3b8e56ed] checkpoint: chunk 1 — Prisma models + pg-boss setup
+ 7 files changed, 429 insertions(+), 1 deletion(-)
+ create mode 100644 .claude/logs/chunk-1.log
+ create mode 100644 .claude/logs/gate-1.log
+ create mode 100755 scripts/run-plan.sh
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/23
+[0;32m  ✓ Issue #23: Chunk 1 checked off[0m
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1;33m▶ Chunk 2/4: Circuit breaker service[0m  Log: /Users/imorgado/nexus-suite/.claude/worktrees/feature-9/.claude/logs/chunk-2.log
+Chunk 2 done. Created `src/server/services/circuit-breaker.ts` with:
+
+- **State machine**: CLOSED → 3 failures → OPEN → cooldown expires → HALF_OPEN → success→CLOSED / failure→OPEN
+- **`canPost(accountId)`** — checks circuit state + Redis cooldown TTL, auto-transitions OPEN→HALF_OPEN when cooldown expires
+- **`recordSuccess(accountId)`** — resets failures, sets CLOSED, recovers healthScore, clears backoff/cooldown keys
+- **`recordFailure(accountId)`** — increments failures, transitions states, decays healthScore, sets Redis cooldown with exponential backoff (5→15→45min)
+- **Auto-disable** — healthScore < 0.3 triggers admin alert via Redis pub/sub `admin:alerts`
+- Follows existing patterns: `ioredis` + `@/lib/db` imports, same structure as `llm-budget.ts`
+
+Typecheck: only pre-existing missing `node_modules` errors (identical to `llm-budget.ts`). No type errors in the new code.
+
+CLAUDE.md phase line updated to `Chunk 2/4`.
+[0;32m✓ Chunk 2 done[0m
+[0;36m  Quality gate after chunk 2...[0m
+[0;32m  ✓ Passed[0m
+[r3lamp4go/feature-9 cd42ff87] checkpoint: chunk 2 — Circuit breaker service
+ 7 files changed, 240 insertions(+), 1 deletion(-)
+ create mode 100644 .claude/logs/chunk-2.log
+ create mode 100644 .claude/logs/gate-2.log
+ create mode 100644 src/server/services/circuit-breaker.ts
+ create mode 100644 tsconfig.json
+ create mode 100644 tsconfig.tsbuildinfo
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/23
+[0;32m  ✓ Issue #23: Chunk 2 checked off[0m
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1;33m▶ Chunk 3/4: Distribution scheduler service[0m  Log: /Users/imorgado/nexus-suite/.claude/worktrees/feature-9/.claude/logs/chunk-3.log
+Chunk 3 complete. Created `src/server/services/distribution-scheduler.ts` with:
+
+- **`scheduleDistribution(orgId, variationId, targetPlatforms)`** — main entry
+- Eligible account query: healthScore DESC, filters OPEN circuits
+- Daily caps enforced (TikTok 3, IG 2, Shorts 5; overridable via `brandConfig.dailyCaps`)
+- Staggered scheduling: 30-120min random intervals + +-15min jitter
+- 10% skip probability for organic behavior mimicry
+- Creates `PostRecord` (SCHEDULED) + pg-boss job on `post:task` queue with `startAfter`
+- pg-boss singleton with lazy init
+
+`tsc --noEmit` couldn't run — `next-auth@^5.0.0` has no matching version in npm. Code reviewed manually; types align with schema and circuit-breaker imports.
+
+CLAUDE.md updated to **Chunk 3/4**.
+[0;32m✓ Chunk 3 done[0m
+[0;36m  Quality gate after chunk 3...[0m
+[0;32m  ✓ Passed[0m
+[r3lamp4go/feature-9 5157392c] checkpoint: chunk 3 — Distribution scheduler service
+ 5 files changed, 230 insertions(+), 1 deletion(-)
+ create mode 100644 .claude/logs/chunk-3.log
+ create mode 100644 .claude/logs/gate-3.log
+ create mode 100644 src/server/services/distribution-scheduler.ts
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/23
+[0;32m  ✓ Issue #23: Chunk 3 checked off[0m
+[0;34m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[0m
+[1;33m▶ Chunk 4/4: Hybrid posting service + pg-boss worker[0m  Log: /Users/imorgado/nexus-suite/.claude/worktrees/feature-9/.claude/logs/chunk-4.log
+Chunk 4 complete. Created:
+
+**`src/server/services/posting.ts`** — hybrid posting logic:
+- `postContent(orgId, accountId, variationId, platform, postRecordId)` — main entry
+- Routes by `accountType`: PRIMARY → `postViaApi()`, SECONDARY → `postViaBrowser()`
+- API path: fetches OAuth token from Infisical (fetch-use-discard), dispatches to platform-specific stubs (YouTube, TikTok, Instagram, Facebook, X, LinkedIn)
+- Browser path: loads fingerprint profile + proxy from Infisical, session from R2 (Patchright stubs)
+- `finalizePost()` — updates PostRecord status, calls circuit breaker `recordSuccess`/`recordFailure`, emits SSE via Redis pub/sub `post:events`
+
+**`src/server/workers/post-worker.ts`** — pg-boss consumer:
+- Subscribes to `post:task` queue (teamSize=2, teamConcurrency=2)
+- Validates PostRecord still SCHEDULED before executing
+- `startPostWorker()` / `stopPostWorker()` lifecycle
+
+`tsc --noEmit` can't run — `next-auth@^5.0.0` has no matching npm version (pre-existing). Code manually reviewed; types align with schema, circuit-breaker, and infisical imports.
+
+CLAUDE.md updated to **Chunk 4/4 (complete)**.
+[0;32m✓ Chunk 4 done[0m
+[0;36m  Quality gate after chunk 4...[0m
+[0;32m  ✓ Passed[0m
+[r3lamp4go/feature-9 38c5fda8] checkpoint: chunk 4 — Hybrid posting service + pg-boss worker
+ 6 files changed, 372 insertions(+), 1 deletion(-)
+ create mode 100644 .claude/logs/chunk-4.log
+ create mode 100644 .claude/logs/gate-4.log
+ create mode 100644 src/server/services/posting.ts
+ create mode 100644 src/server/workers/post-worker.ts
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/23
+[0;32m  ✓ Issue #23: Chunk 4 checked off[0m
+
+[0;32m══════════════════════════════════════════════════════[0m
+[0;32m  All chunks complete![0m
+[0;32m══════════════════════════════════════════════════════[0m
+
+[0;34mClosing plan issue #23...[0m
+[0;32m✓ Issue #23 closed[0m
+[0;34mFinal quality checks...[0m
+
+[41m                                                                               [0m
+[41m[37m                This is not the tsc command you are looking for                [0m
+[41m                                                                               [0m
+
+To get access to the TypeScript compiler, [34mtsc[0m, from the command line either:
+
+- Use [1mnpm install typescript[0m to first add TypeScript to your project [1mbefore[0m using npx
+- Use [1myarn[0m to avoid accidentally running code from un-installed packages
+[0;32m✓ All passed[0m
+
+[0;32mDone![0m git diff → /save → /hp

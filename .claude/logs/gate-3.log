@@ -1,9 +1,9 @@
-src/app/api/webhooks/stripe/route.ts(57,9): error TS2322: Type 'Record<string, unknown>' is not assignable to type 'NullableJsonNullValueInput | InputJsonValue | undefined'.
-  Type 'Record<string, unknown>' is missing the following properties from type 'readonly (InputJsonValue | null)[]': length, concat, join, slice, and 26 more.
-src/app/api/webhooks/stripe/route.ts(188,7): error TS2322: Type '"CANCELED"' is not assignable to type 'OnboardingStatus | EnumOnboardingStatusFieldUpdateOperationsInput | undefined'.
-src/app/api/webhooks/stripe/route.ts(206,13): error TS2322: Type '"PAST_DUE"' is not assignable to type 'OnboardingStatus | EnumOnboardingStatusFieldUpdateOperationsInput | undefined'.
-src/lib/infisical.ts(49,25): error TS2554: Expected 2 arguments, but got 1.
-src/lib/infisical.ts(58,25): error TS2554: Expected 2 arguments, but got 1.
-src/lib/stripe.ts(4,3): error TS2322: Type '"2025-04-30.basil"' is not assignable to type '"2025-02-24.acacia"'.
-src/server/workflows/control-flow.ts(50,16): error TS2551: Property 'outputAs' does not exist on type 'StepResult'. Did you mean 'output'?
-src/server/workflows/executor.ts(318,38): error TS7006: Parameter 'd' implicitly has an 'any' type.
+
+[41m                                                                               [0m
+[41m[37m                This is not the tsc command you are looking for                [0m
+[41m                                                                               [0m
+
+To get access to the TypeScript compiler, [34mtsc[0m, from the command line either:
+
+- Use [1mnpm install typescript[0m to first add TypeScript to your project [1mbefore[0m using npx
+- Use [1myarn[0m to avoid accidentally running code from un-installed packages

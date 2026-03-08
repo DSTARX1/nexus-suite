@@ -1,0 +1,6 @@
+Plan issue created: **#23** — 4 chunks:
+
+1. **Prisma models + pg-boss setup** — SourceVideo, VideoVariation, PostRecord models + pg-boss dep
+2. **Circuit breaker service** — state machine (CLOSED→OPEN→HALF_OPEN), Redis cooldowns, healthScore auto-disable
+3. **Distribution scheduler** — staggered timing, daily caps, jitter, skip probability, pg-boss job creation
+4. **Hybrid posting + worker** — API vs browser routing, platform stubs, pg-boss consumer, SSE events
