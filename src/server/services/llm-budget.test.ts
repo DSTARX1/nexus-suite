@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest";
 
 // ── Mock Redis ──────────────────────────────────────────────────
 const redisMock = {
@@ -34,10 +34,17 @@ vi.mock("@/lib/db", () => ({
   db: dbMock,
 }));
 
-// Import AFTER mocks are set up
-const { trackLlmSpend, checkLlmBudget, getSpendSummary } = await import(
-  "./llm-budget"
-);
+// Import AFTER mocks are set up — wrapped in async to avoid top-level await in CJS
+let trackLlmSpend: Awaited<typeof import("./llm-budget.js")>["trackLlmSpend"];
+let checkLlmBudget: Awaited<typeof import("./llm-budget.js")>["checkLlmBudget"];
+let getSpendSummary: Awaited<typeof import("./llm-budget.js")>["getSpendSummary"];
+
+beforeAll(async () => {
+  const mod = await import("./llm-budget.js");
+  trackLlmSpend = mod.trackLlmSpend;
+  checkLlmBudget = mod.checkLlmBudget;
+  getSpendSummary = mod.getSpendSummary;
+});
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -129,7 +129,7 @@ describe("executor", () => {
 
   describe("agent-delegate", () => {
     it("checks LLM budget pre-flight", async () => {
-      const { checkLlmBudget } = await import("../services/llm-budget");
+      const { checkLlmBudget } = await import("../services/llm-budget.js");
       const mockCheck = vi.mocked(checkLlmBudget);
       mockCheck.mockResolvedValueOnce({
         allowed: false,

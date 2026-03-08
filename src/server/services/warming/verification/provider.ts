@@ -33,12 +33,12 @@ export async function createVerificationProvider(
 
   switch (resolved) {
     case "imap": {
-      const { ImapVerificationProvider } = await import("./imap");
+      const { ImapVerificationProvider } = await import("./imap.js");
       return new ImapVerificationProvider();
     }
     case "smspool":
     case "5sim": {
-      const { SmsVerificationProvider } = await import("./sms");
+      const { SmsVerificationProvider } = await import("./sms.js");
       return new SmsVerificationProvider(resolved);
     }
     default:

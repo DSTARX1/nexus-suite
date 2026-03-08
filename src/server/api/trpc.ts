@@ -73,7 +73,7 @@ export const authedProcedure = t.procedure.use(enforceAuth);
 // Also enforces per-route feature gates
 
 const enforceSubscription = t.middleware(async ({ ctx, next }) => {
-  const { organizationId } = ctx as { organizationId?: string };
+  const { organizationId } = ctx as unknown as { organizationId?: string };
 
   if (!organizationId) {
     throw new TRPCError({
@@ -171,7 +171,7 @@ export function tierGatedProcedure(feature: FeatureGate) {
   const enforceTierGate = t.middleware(async ({ ctx, next }) => {
     const features = (ctx as { session: { user: { features?: Record<string, unknown> } } })
       .session.user.features;
-    const orgId = (ctx as { organizationId: string }).organizationId;
+    const orgId = (ctx as unknown as { organizationId: string }).organizationId;
 
     if (!features) {
       throw new TRPCError({

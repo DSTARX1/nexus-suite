@@ -32,8 +32,8 @@ export async function startPostWorker(): Promise<void> {
 
   await b.work<PostTaskPayload>(
     QUEUE_NAME,
-    { teamSize: 2, teamConcurrency: 2 },
-    async (job) => {
+    { batchSize: 2 },
+    async ([job]) => {
       const { orgId, accountId, variationId, platform, postRecordId } = job.data;
 
       // Verify PostRecord still exists and is SCHEDULED

@@ -1,12 +1,12 @@
 import { registerAgent } from "../server/workflows/agent-delegate";
-import { generateOrchestrator } from "./orchestrator/agent";
+import { executeOrchestrator } from "./orchestrator/agent";
 import { generateWorkflow } from "./orchestrator/workflow-agent";
-// Platform agents
-import { generateYoutube } from "./platforms/youtube/agent";
-import { generateTiktok } from "./platforms/tiktok/agent";
-import { generateInstagram } from "./platforms/instagram/agent";
-import { generateLinkedin } from "./platforms/linkedin/agent";
-import { generateX } from "./platforms/x/agent";
+// Platform agents — export Agent instances, not generate functions
+import { youtubeMainAgent } from "./platforms/youtube/agent";
+import { tiktokMainAgent } from "./platforms/tiktok/agent";
+import { instagramMainAgent } from "./platforms/instagram/agent";
+import { linkedinMainAgent } from "./platforms/linkedin/agent";
+import { xMainAgent } from "./platforms/x/agent";
 import { generateFacebook } from "./platforms/facebook/agent";
 // Specialist agents
 import { generate as generateSeo } from "./specialists/seo-agent";
@@ -18,7 +18,7 @@ import { generate as generateCaptionWriter } from "./specialists/caption-writer"
 import { generate as generateHashtagOptimizer } from "./specialists/hashtag-optimizer";
 import { generate as generateThreadWriter } from "./specialists/thread-writer";
 import { generate as generateArticleWriter } from "./specialists/article-writer";
-import { generate as generateTrendScout } from "./specialists/trend-scout";
+import { trendScoutAgent } from "./specialists/trend-scout";
 import { generate as generateEngagementResponder } from "./specialists/engagement-responder";
 import { generate as generateAnalyticsReporter } from "./specialists/analytics-reporter";
 import { generate as generateContentRepurposer } from "./specialists/content-repurposer";
@@ -33,29 +33,43 @@ import { generate as generateViralTeardown } from "./specialists/viral-teardown-
  */
 export function bootstrapAgents(): void {
   // Tier 1: Orchestration (2)
-  registerAgent("nexus-orchestrator", (prompt, opts) =>
-    generateOrchestrator(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
+  registerAgent("nexus-orchestrator", async (prompt) => {
+    const result = await executeOrchestrator(prompt, {
+      organizationId: "",
+      workflowName: "",
+      runId: "",
+      variables: {},
+      config: {},
+      input: { userPrompt: prompt },
+      aborted: false,
+    });
+    return result as { text: string };
+  });
   registerAgent("workflow-agent", (prompt, opts) =>
     generateWorkflow(prompt, { organizationId: "", userPrompt: prompt }, opts),
   );
 
-  // Tier 2: Platform agents (6)
-  registerAgent("youtube-agent", (prompt, opts) =>
-    generateYoutube(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
-  registerAgent("tiktok-agent", (prompt, opts) =>
-    generateTiktok(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
-  registerAgent("instagram-agent", (prompt, opts) =>
-    generateInstagram(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
-  registerAgent("linkedin-agent", (prompt, opts) =>
-    generateLinkedin(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
-  registerAgent("x-agent", (prompt, opts) =>
-    generateX(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
+  // Tier 2: Platform agents (6) — wrap Agent.generate for those without a generate fn
+  registerAgent("youtube-agent", async (prompt, opts) => {
+    const result = await youtubeMainAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
+  registerAgent("tiktok-agent", async (prompt, opts) => {
+    const result = await tiktokMainAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
+  registerAgent("instagram-agent", async (prompt, opts) => {
+    const result = await instagramMainAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
+  registerAgent("linkedin-agent", async (prompt, opts) => {
+    const result = await linkedinMainAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
+  registerAgent("x-agent", async (prompt, opts) => {
+    const result = await xMainAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
   registerAgent("facebook-agent", (prompt, opts) =>
     generateFacebook(prompt, { organizationId: "", userPrompt: prompt }, opts),
   );
@@ -88,9 +102,10 @@ export function bootstrapAgents(): void {
   registerAgent("article-writer", (prompt, opts) =>
     generateArticleWriter(prompt, { organizationId: "", userPrompt: prompt }, opts),
   );
-  registerAgent("trend-scout", (prompt, opts) =>
-    generateTrendScout(prompt, { organizationId: "", userPrompt: prompt }, opts),
-  );
+  registerAgent("trend-scout", async (prompt, opts) => {
+    const result = await trendScoutAgent.generate(prompt, { maxTokens: opts?.maxTokens });
+    return { text: result.text };
+  });
   registerAgent("engagement-responder", (prompt, opts) =>
     generateEngagementResponder(prompt, { organizationId: "", userPrompt: prompt }, opts),
   );

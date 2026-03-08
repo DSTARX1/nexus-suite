@@ -3,7 +3,7 @@ set -eo pipefail
 
 # ── CUSTOMIZE THESE (run-feature fills them in) ──────────────────────────────
 PROJECT_DIR="${WORKTREE_PROJECT_DIR:-/Users/imorgado/nexus-suite}"
-CHECK_CMD="npx tsc --noEmit 2>&1 || true"
+CHECK_CMD="npx tsc --noEmit"
 
 # Ensure node_modules/.bin + bun + project venvs in PATH
 export PATH="$PROJECT_DIR/node_modules/.bin:$HOME/.bun/bin:$PATH"
@@ -14,6 +14,19 @@ done
 export GIT_PAGER=cat
 # Disable husky pre-commit hooks for all git operations (script + Claude CLI)
 export HUSKY=0
+
+# ── Safe git add (ensures .gitignore exists, strips generated dirs) ──────────
+safe_git_add() {
+  local _dir="${1:-$PROJECT_DIR}"
+  cd "$_dir"
+  # Create minimal .gitignore if missing
+  if [[ ! -f ".gitignore" ]]; then
+    printf '%s\n' "node_modules/" ".next/" "dist/" ".venv/" "__pycache__/" "*.pyc" "*.log" ".claude/logs/" ".DS_Store" > .gitignore
+  fi
+  git add -A
+  # Safety net: unstage generated dirs even if .gitignore was added late
+  git reset HEAD -- node_modules/ .next/ dist/ __pycache__/ .venv/ 2>/dev/null || true
+}
 
 # Colors
 RED='\033[0;31m'
@@ -332,7 +345,7 @@ PROMPT
       echo -e "${YELLOW}⚠ No plan issue found but Claude made code changes — treating feature #$FEATURE_ISSUE as plan${NC}"
       echo -e "${YELLOW}  Changed files: $(echo "$_changed_files" | head -5 | tr '\n' ' ')${NC}"
       # Commit the work so build phase doesn't lose it
-      git add -A 2>/dev/null || true
+      safe_git_add 2>/dev/null || true
       git -c core.hooksPath=/dev/null commit -m "direct-build: $FEATURE_TITLE (#$FEATURE_ISSUE)" 2>/dev/null || true
       PLAN_ISSUE="$FEATURE_ISSUE"
     fi
@@ -366,7 +379,7 @@ run_build() {
   if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null || [[ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ]]; then
     if [[ -n "${WORKTREE_PROJECT_DIR:-}" ]]; then
       echo -e "${YELLOW}⚠ Committing dirty state from previous failed build${NC}"
-      git add -A 2>>"$LOG_DIR/build.log" || true
+      safe_git_add 2>>"$LOG_DIR/build.log" || true
       git commit -m "wip: auto-save dirty state before feature-$FEATURE_ISSUE" 2>>"$LOG_DIR/build.log" || true
     else
       echo -e "${YELLOW}⚠ Stashing uncommitted changes from previous run${NC}"
@@ -461,7 +474,7 @@ PROMPT
     # Commit partial fixes before gate check (preserves work across retries)
     cd "$PROJECT_DIR"
     if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
-      git add -A
+      safe_git_add
       git -c core.hooksPath=/dev/null commit -m "validate: attempt $attempt for $FEATURE_TITLE" 2>/dev/null || true
       echo -e "${GREEN}  ✓ Partial fixes committed${NC}"
     fi
@@ -508,7 +521,7 @@ run_ship() {
 
     # Auto-commit any leftover changes
     if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
-      git add -A
+      safe_git_add
       git -c core.hooksPath=/dev/null commit -m "chore: pre-ship cleanup for $FEATURE_TITLE" 2>/dev/null || true
     fi
 
@@ -558,7 +571,7 @@ run_ship() {
   # Auto-commit any leftover changes (CLAUDE.md phase line, etc.)
   if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$(git ls-files --others --exclude-standard)" ]]; then
     echo -e "${CYAN}  Committing leftover changes...${NC}"
-    git add -A
+    safe_git_add
     if ! git -c core.hooksPath=/dev/null commit -m "chore: pre-ship cleanup for $FEATURE_TITLE" 2>>"$LOG_DIR/ship.log"; then
       echo -e "${RED}✗ Auto-commit failed — check git status${NC}"
       git status

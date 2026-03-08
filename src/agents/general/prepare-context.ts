@@ -1,6 +1,8 @@
 // Data minimization per Decision 3 — each agent receives ONLY the fields it needs.
 // Takes full workflow context + agent name → returns stripped context.
 
+import type { RawAgentContext } from "./types";
+
 interface FullContext {
   organizationId: string;
   workflowName: string;
@@ -65,16 +67,33 @@ const DEFAULT_WHITELIST: readonly string[] = ["organizationId", "input", "variab
 
 /**
  * Strips workflow context down to only the fields the target agent needs.
- * Prevents agents from accessing config, secrets references, or
- * workflow internals beyond their scope.
+ * Supports two calling conventions:
+ *   prepareContext(fullContext, agentName) — orchestrator style
+ *   prepareContext(agentName, rawContext) — specialist style
  */
-export function prepareContext(fullContext: FullContext, agentName: string): StrippedContext {
+export function prepareContext(fullContext: FullContext, agentName: string): StrippedContext;
+export function prepareContext(agentName: string, rawContext: RawAgentContext): StrippedContext;
+export function prepareContext(
+  first: FullContext | string,
+  second: string | RawAgentContext,
+): StrippedContext {
+  let context: Record<string, unknown>;
+  let agentName: string;
+
+  if (typeof first === "string") {
+    agentName = first;
+    context = second as RawAgentContext;
+  } else {
+    context = first;
+    agentName = second as string;
+  }
+
   const whitelist = AGENT_WHITELISTS[agentName] ?? DEFAULT_WHITELIST;
   const stripped: StrippedContext = {};
 
   for (const key of whitelist) {
-    if (key in fullContext) {
-      stripped[key] = fullContext[key];
+    if (key in context) {
+      stripped[key] = context[key];
     }
   }
 

@@ -105,7 +105,7 @@ export async function checkUsageLimit(
     select: { [gate]: true },
   });
 
-  const limit = (org?.[gate] as number) ?? 0;
+  const limit = (org?.[gate] as unknown as number) ?? 0;
 
   if (current >= limit) {
     return {

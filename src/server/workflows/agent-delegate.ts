@@ -1,6 +1,6 @@
 import type { WorkflowContext } from "./control-flow";
 import { trackLlmSpend } from "../services/llm-budget";
-import type { WrappedToolResult } from "@/agents/general/tool-wrappers";
+import type { WrappedToolResult } from "@/agents/general/cli-tool-wrappers";
 
 // Agent registry: maps agent name → generate function + optional tools
 // Populated at startup when Mastra agents are initialized

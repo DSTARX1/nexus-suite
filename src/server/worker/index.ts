@@ -20,7 +20,7 @@ async function start(): Promise<void> {
   console.log("[worker] connecting to Redis for BullMQ...");
   const bullWorker = new Worker(
     "default",
-    async (job) => {
+    async (job: { id?: string; name: string }) => {
       console.log(`[worker] bullmq job=${job.id} name=${job.name}`);
     },
     { connection: { url: REDIS_URL } },

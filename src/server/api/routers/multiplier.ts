@@ -126,6 +126,7 @@ export const multiplierRouter = createTRPCRouter({
 
       // Create staggered PostRecord entries across accounts/variations
       const records: Array<{
+        organizationId: string;
         accountId: string;
         variationId: string;
         platform: Platform;
@@ -139,6 +140,7 @@ export const multiplierRouter = createTRPCRouter({
             input.startAt.getTime() + slotIndex * input.intervalMinutes * 60_000,
           );
           records.push({
+            organizationId: ctx.organizationId,
             accountId: account.id,
             variationId,
             platform: account.platform,
