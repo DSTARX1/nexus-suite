@@ -1,21 +1,11 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-Chunk 1 done. `getWorkflowStats` now queries `PostRecord.groupBy({ by: ['status'] })` and maps `POSTING→active`, `SUCCESS→completed`, `FAILED→failed`, `SCHEDULED→queued`. TypeCheck passes clean.
+Chunk 1 done. Created `src/server/services/platform-apis/meta.ts` with:
 
-Phase 1 done. Resume: `gh issue view 47`, execute Chunk 2. Files: `src/server/api/routers/dashboard.ts`. Issues: none.
-=======
-Chunk 1 done. Changes in `src/server/api/routers/competitors.ts`:
+1. **`MetaAuthConfig`** type — access token, page ID, IG user ID
+2. **`getMetaAuth()`** — parallel `fetchSecret()` calls for all 3 Meta secrets (fetch-use-discard)
+3. **`isMockMode()`** — reads `MOCK_PLATFORM_APIS` env var
+4. **`getVideoUrl()`** — delegates to `getSignedUrl()` from r2-storage
+5. **`mockPostResult()`** — returns fake success with synthetic UUID
 
-- Added pg-boss singleton (`getBoss()`) + `competitor:task` queue constant
-- `analyzePost` → sends job `{ jobType: "analyze", postId, url, organizationId }`
-- `reproducePost` → sends job `{ jobType: "reproduce", postId, url, organizationId }`
-- Fixed field name: schema has `url` not `postUrl`
-- Typecheck passes clean
+Typecheck passes clean. Phase line updated in CLAUDE.md.
 
-Phase 1 done. Resume: `gh issue view 49`, execute Chunk 2. Files: `src/server/api/routers/competitors.ts`. Issues: none.
->>>>>>> feature-33
-=======
-Chunk 1 done. Created `src/server/services/media-queue.ts` — pg-boss singleton + `sendMediaJob()` sender for `media:task` queue. Mirrors the pattern from `distribution-scheduler.ts` and `warming/queue.ts`. Typecheck passes clean.
-
-Phase 1 done. Resume: `gh issue view 48`, execute Chunk 2. Files: `src/server/services/media-queue.ts`. Issues: none.
->>>>>>> feature-34
+Phase 1 done. Resume: `gh issue view 52`, execute Chunk 2. Files: `src/server/services/platform-apis/meta.ts`, `src/server/services/posting.ts`. Issues: none.
