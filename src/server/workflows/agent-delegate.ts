@@ -38,6 +38,10 @@ interface RegisteredAgent {
 
 const agentRegistry = new Map<string, RegisteredAgent>();
 
+export function getRegisteredAgents(): ReadonlyMap<string, RegisteredAgent> {
+  return agentRegistry;
+}
+
 export function registerAgent(
   name: string,
   generateFn: AgentGenerateFn,
