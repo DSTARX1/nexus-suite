@@ -1,0 +1,19 @@
+Chunk 1 done. Here's what was built:
+
+**Files created:**
+- `services/scraper-pool/package.json` — standalone service w/ patchright, ioredis, pg-boss deps
+- `services/scraper-pool/tsconfig.json` — ES2022/Node16 module config
+- `services/scraper-pool/src/fingerprint.ts` — copied from `src/lib/fingerprint.ts`
+- `services/scraper-pool/src/pool.ts` — `AgentPool` class: async semaphore, N pre-warmed Patchright contexts, fingerprint injection on creation, `acquire()`/`release()`/`recycle()`/`shutdown()` lifecycle
+- `services/scraper-pool/src/index.ts` — entrypoint w/ graceful shutdown
+
+**AgentPool key behaviors:**
+- Launches headless Chromium via Patchright with anti-detection flags
+- Creates `POOL_SIZE` (default 8) contexts with unique fingerprints (UA, viewport, timezone, WebGL, platform, languages)
+- Async semaphore: `acquire()` returns immediately if context available, otherwise queues caller
+- `recycle()` closes old context, creates fresh one with new fingerprint (used by Chunk 2's rotation)
+- Tracks `taskCount` per context for fingerprint rotation threshold
+
+**Typecheck:** `tsc --noEmit` passes clean.
+
+Phase 1 done. Resume: `gh issue view 18`, execute Chunk 2. Files: `services/scraper-pool/src/`. Issues: none.
