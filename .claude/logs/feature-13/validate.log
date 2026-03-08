@@ -1,0 +1,6 @@
+Done. Two wiring gaps fixed:
+
+1. **`/models` volume missing** — ml-sidecar writes trained models to `/models` on retrain, but no named volume existed → models lost on restart. Added `ml_models` volume in docker-compose.yml.
+2. **Permission gap** — Dockerfile runs as `mluser` (non-root) but `/models` was root-owned at container start → writes would fail on a fresh volume mount. Fixed by pre-creating `/models` with correct ownership before switching user.
+
+Both Python services are syntactically valid, both registered correctly in docker-compose.yml with proper ports (8001/8002), env vars, and health checks.
