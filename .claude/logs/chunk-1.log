@@ -1,10 +1,3 @@
-Chunk 1 complete. Created 4 files in `src/agents/general/`:
+Chunk 1 done. Added `SessionProvider` from `next-auth/react` as outermost wrapper in `src/app/providers.tsx`. Typecheck passes clean.
 
-- **`safety.ts`** — `validateNoCredentials()` (regex scan for leaked keys/tokens), `stripPII()` (email/phone/SSN/card masking), `enforceToolScope()` (per-agent tool whitelist)
-- **`tool-wrappers.ts`** — `wrapToolHandler()` wraps every Mastra tool with: scope enforcement → PII strip → timing → credential leak detection → diagnostics ring buffer
-- **`prepare-context.ts`** — `prepareContext()` strips workflow context per Decision 3 whitelists (Tier 1 gets full context, Tier 2 gets org+input+vars, Tier 3/2.5 get org+input only)
-- **`index.ts`** — barrel export
-
-Zero type errors in new files. Also fixed `next-auth` version pin and added `tsconfig.json` (was missing).
-
-Phase 1 done. Resume: `gh issue view 16`, execute Chunk 2. Files: `src/agents/general/*`. Issues: none.
+Phase 1 done. Resume: `gh issue view 44`, execute Chunk 2. Files: `src/app/providers.tsx`. Issues: none.
