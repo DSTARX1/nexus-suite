@@ -4,6 +4,7 @@ import { provision } from "./commands/provision";
 import { assignProxy } from "./commands/assign-proxy";
 import { generateWorkflows } from "./commands/generate-workflows";
 import { warmupStart } from "./commands/warmup-start";
+import { initPlugin } from "./commands/init-plugin";
 
 const program = new Command();
 
@@ -45,6 +46,15 @@ program
   .argument("<accountId>", "OrgPlatformToken ID")
   .action(async (accountId: string) => {
     await warmupStart(accountId);
+  });
+
+program
+  .command("init-plugin")
+  .description("Scaffold a client plugin agent for an organization")
+  .argument("<orgId>", "Organization ID")
+  .argument("<agentName>", "Agent name (e.g., custom-writer)")
+  .action(async (orgId: string, agentName: string) => {
+    await initPlugin(orgId, agentName);
   });
 
 program.parse();

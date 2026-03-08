@@ -65,6 +65,10 @@ const AGENT_WHITELISTS: Record<string, readonly string[]> = {
 
 const DEFAULT_WHITELIST: readonly string[] = ["organizationId", "input", "variables"];
 
+// Client plugins (loaded from clients/{orgId}/) get the most restrictive whitelist:
+// no variables, no config, no Infisical-related keys — organizationId + input only.
+export const CLIENT_PLUGIN_WHITELIST: readonly string[] = ["organizationId", "input"];
+
 /**
  * Strips workflow context down to only the fields the target agent needs.
  * Supports two calling conventions:

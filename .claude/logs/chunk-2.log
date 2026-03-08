@@ -1,8 +1,11 @@
-Chunk 2 done. Created `src/server/workflows/engagement-sweep.yaml` with:
+Chunk 2 done. TypeScript passes clean.
 
-- **Cron trigger**: `0 */4 * * *` (every 4h)
-- **Step 1**: `analytics-reporter` agent collects engagement data
-- **Step 2**: `condition` gate on `actionableCount >= 1` — runs `engagement-responder` on true, logs skip on false
-- **Step 3**: `engagement.compileReport` action compiles final report
+**Changes:**
 
-All validator layers satisfied: unique IDs, valid `dependsOn` refs, no cycles, `{{var}}` refs trace to `input.*`/`outputAs`, agent-delegate steps have non-empty prompts. Type-check passes clean.
+- **`prepare-context.ts`**: Added `CLIENT_PLUGIN_WHITELIST = ["organizationId", "input"]` — most restrictive whitelist, no `variables`/`config`/Infisical keys
+- **`agent-delegate.ts`**:
+  - Imported `CLIENT_PLUGIN_WHITELIST`
+  - `resolveAgent` now returns `ResolvedAgent` with `isClientPlugin` flag
+  - `executeAgentDelegate` builds a sandboxed context for client plugins, stripping everything except whitelist keys before passing to the plugin's generate function
+
+Phase 2 done. Resume: `gh issue view 81`, execute chunk 3. Files: `src/agents/general/prepare-context.ts`, `src/server/workflows/agent-delegate.ts`. Issues: none.

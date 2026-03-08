@@ -1,24 +1,6 @@
-## Chunk 3: Create content-repurpose.yaml
+Chunk 3 done. Created:
 
-### Files changed
-- `src/server/workflows/content-repurpose.yaml` (created)
-- `CLAUDE.md` (updated phase line)
+- **`src/cli/commands/init-plugin.ts`** — `nexus-admin init-plugin <orgId> <agentName>` command that validates org in DB, creates `src/agents/clients/{orgId}/agents/` dir, writes template agent file with `generate` + `createAgent` exports (no Infisical imports, sandboxed context)
+- **`src/cli/index.ts`** — wired `init-plugin` command following existing Commander pattern
 
-### What was built
-Manually-triggered workflow: content-repurposer → forEach(targetPlatforms, maxConcurrency:3) { variation-orchestrator → content.schedule }
-
-- Step 1: `analyze-source` — agent-delegate to content-repurposer, analyzes source content
-- Step 2: `per-platform` — forEach over targetPlatforms with maxConcurrency 3
-  - `generate-variation` — agent-delegate to variation-orchestrator, platform-specific adaptation
-  - `schedule-variation` — action content.schedule, schedules each variation
-
-### Validator compliance
-- Layer 3: unique step IDs ✓
-- Layer 4: dependsOn refs valid (per-platform → analyze-source, schedule-variation → generate-variation) ✓
-- Layer 5: no circular deps ✓
-- Layer 6: var refs trace to input.* or outputAs ✓
-- Layer 7: agent-delegate prompts non-empty ✓
-- Layer 9: forEach has maxConcurrency ✓
-
-### TypeScript
-- `npx tsc --noEmit` — clean, no errors
+Typecheck passes clean. CLAUDE.md updated to chunk 3/3.

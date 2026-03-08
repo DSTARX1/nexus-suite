@@ -1,11 +1,7 @@
-Chunk 1 done. Created `src/server/workflows/daily-pipeline.yaml` with:
+Chunk 1 done. Summary of changes to `src/server/workflows/agent-delegate.ts`:
 
-- **Cron trigger**: `0 6 * * *` (daily 6 AM UTC)
-- **Inputs**: `organizationId`, `platform`, `niche`
-- **5-step chain**: `trend-scout` → `script-agent` → `caption-writer` → `quality-scorer` → condition gate
-- **`dependsOn`** chaining between all steps, **`outputAs`** to pass data forward
-- **Quality gate**: `condition` step checks `{{quality.score}} >= 7` — schedules on true, logs skip on false
-
-TypeScript passes clean. CLAUDE.md updated.
-
-Phase 1 done. Resume: `gh issue view 77`, execute Chunk 2. Files: `src/server/workflows/daily-pipeline.yaml`. Issues: none.
+- Added `clientPluginCache` map keyed by `orgId::agentName`
+- Added `loadClientPlugin(orgId, agentName)` — resolves path to `src/agents/clients/{orgId}/agents/{agentName}.ts`, checks existence via `existsSync`, dynamic `import()`, validates `generate` export, caches result
+- Made `resolveAgent` async — tier 1 now calls `loadClientPlugin` before platform/specialist fallback
+- `executeAgentDelegate` now `await`s the async `resolveAgent`
+- Typecheck passes clean
