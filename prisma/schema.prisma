@@ -1,0 +1,281 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgvector(map: "vector"), pgcrypto]
+}
+
+// ── Enums ────────────────────────────────────────────────────────
+
+enum SubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
+}
+
+enum OnboardingStatus {
+  PENDING_PAYMENT
+  PENDING_SETUP
+  ACTIVE
+  SUSPENDED
+}
+
+enum OrgRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum Platform {
+  YOUTUBE
+  TIKTOK
+  INSTAGRAM
+  LINKEDIN
+  X
+  FACEBOOK
+}
+
+enum AccountType {
+  PRIMARY
+  SECONDARY
+}
+
+enum CircuitState {
+  CLOSED
+  OPEN
+  HALF_OPEN
+}
+
+enum WarmupStatus {
+  NOT_STARTED
+  WARMING
+  READY
+}
+
+enum PricingTier {
+  PRO
+  MULTIPLIER
+  ENTERPRISE
+}
+
+// ── Auth (NextAuth v5) ───────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  memberships   OrgMember[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ── Multi-Tenant: Organization ───────────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Stripe (SwaS)
+  stripeCustomerId      String?  @unique
+  stripeSubscriptionId  String?  @unique
+  setupPaymentIntentId  String?
+
+  // Status
+  subscriptionStatus OnboardingStatus @default(PENDING_PAYMENT)
+  onboardingStatus   OnboardingStatus @default(PENDING_PAYMENT)
+  pricingTier        PricingTier      @default(PRO)
+
+  // Feature gates (denormalized from tier for fast checks)
+  maxAccounts        Int     @default(3)
+  maxWorkflowRuns    Int     @default(50)
+  maxVideosPerMonth  Int     @default(30)
+  mlFeaturesEnabled  Boolean @default(false)
+  multiplierEnabled  Boolean @default(false)
+  dailyLlmBudgetCents Int   @default(500) // 500 = $5/day Pro, 1500 = $15/day Multiplier
+
+  // Brand
+  brandConfig Json? // org-scoped brand voice, content strategy
+
+  // Relations
+  members              OrgMember[]
+  platformTokens       OrgPlatformToken[]
+  usageRecords         UsageRecord[]
+  onboardingSubmission OnboardingSubmission?
+}
+
+// ── Multi-Tenant: Membership ─────────────────────────────────────
+
+model OrgMember {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole  @default(MEMBER)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+// ── Platform Tokens (Infisical refs only — NO raw credentials) ──
+
+model OrgPlatformToken {
+  id             String   @id @default(cuid())
+  organizationId String
+  platform       Platform
+  accountLabel   String   // human-readable label ("Main Brand", "Burner-TikTok-3")
+  accountType    AccountType @default(PRIMARY)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Infisical Secret ID references — DB stores ONLY these paths
+  // e.g. "orgs/{orgId}/tokens/{tokenId}" → resolved at runtime via Infisical SDK
+  infisicalSecretPath String  // path to access/refresh tokens in Infisical
+  infisicalProxyPath  String? // path to assigned proxy URL in Infisical (burners only)
+
+  // Health tracking
+  healthScore          Float        @default(1.0) // 0.0-1.0
+  consecutiveFailures  Int          @default(0)
+  circuitState         CircuitState @default(CLOSED)
+  lastFailureAt        DateTime?
+  lastSuccessAt        DateTime?
+
+  // Browser automation (SECONDARY accounts only)
+  fingerprintProfileId String?         @unique
+  fingerprintProfile   BrowserProfile? @relation(fields: [fingerprintProfileId], references: [id])
+  sessionStoragePath   String?         // R2 key: "sessions/{orgId}/{accountId}/state.json"
+  warmupStatus         WarmupStatus    @default(NOT_STARTED)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform, accountLabel])
+  @@index([organizationId, platform])
+  @@index([warmupStatus])
+}
+
+// ── Browser Fingerprint Profile (1:1 per burner account) ─────────
+
+model BrowserProfile {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Browser identity (generated once, reused consistently)
+  userAgent           String
+  screenWidth         Int
+  screenHeight        Int
+  hardwareConcurrency Int
+  platform            String   // "Win32", "MacIntel", "Linux x86_64"
+  languages           String[] // ["en-US", "en"]
+
+  // Canvas/WebGL spoofing
+  canvasNoiseSeed String // deterministic seed for canvas noise injection
+  webglVendor     String // e.g. "NVIDIA Corporation"
+  webglRenderer   String // e.g. "GeForce RTX 3060"
+
+  // Locale
+  timezone String // e.g. "America/New_York"
+  locale   String // e.g. "en-US"
+
+  // Back-reference
+  platformToken OrgPlatformToken?
+}
+
+// ── Stripe Webhook Idempotency ───────────────────────────────────
+
+model StripeEvent {
+  id              String   @id // Stripe event ID (evt_xxx) — natural key for dedup
+  type            String   // e.g. "checkout.session.completed"
+  processedAt     DateTime @default(now())
+  organizationId  String?  // linked org (if applicable)
+  payload         Json?    // optional: store event payload for debugging
+
+  @@index([type])
+  @@index([organizationId])
+}
+
+// ── Usage Tracking (Tier Enforcement) ────────────────────────────
+
+model UsageRecord {
+  id             String   @id @default(cuid())
+  organizationId String
+  metric         String   // "accounts", "workflow_runs", "videos", "llm_spend_cents"
+  period         String   // "2026-03" (monthly) or "2026-03-07" (daily for LLM)
+  count          Int      @default(0)
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, metric, period])
+  @@index([organizationId, metric])
+}
+
+// ── Onboarding (Post-Payment Wizard) ─────────────────────────────
+
+model OnboardingSubmission {
+  id             String   @id @default(cuid())
+  organizationId String   @unique
+  submittedAt    DateTime @default(now())
+
+  // Wizard data
+  niche            String   // content vertical
+  brandVoice       String?  @db.Text // brand voice description
+  tonePreferences  String?  @db.Text // tone preferences
+  competitorUrls   Json     @default("[]") // String[] of profile URLs
+  platforms        Json     @default("[]") // Platform[] they want to target
+  postingFrequency String?  // "daily", "3x/week", etc.
+  contentStyle     String?  // "educational", "entertainment", etc.
+  additionalNotes  String?  @db.Text
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}

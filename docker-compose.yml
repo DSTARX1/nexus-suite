@@ -1,0 +1,263 @@
+services:
+  # ── Infrastructure ──────────────────────────────────────────────
+  db:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_dev}
+      POSTGRES_DB: nexus
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Secrets Management ──────────────────────────────────────────
+  infisical:
+    image: infisical/infisical:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      ENCRYPTION_KEY: ${INFISICAL_ENCRYPTION_KEY:-must-be-32-chars-for-production!}
+      AUTH_SECRET: ${INFISICAL_AUTH_SECRET:-dev-auth-secret-change-in-prod}
+      SITE_URL: http://infisical:8080
+      DB_CONNECTION_URI: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@infisical-db:5432/infisical
+      REDIS_URL: redis://redis:6379/1
+    depends_on:
+      infisical-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Infisical needs its own Postgres (separate from app DB)
+  infisical-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nexus_dev}
+      POSTGRES_DB: infisical
+    volumes:
+      - infisical_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Application ─────────────────────────────────────────────────
+  nexus-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@db:5432/nexus
+      REDIS_URL: redis://redis:6379/0
+      INFISICAL_SITE_URL: http://infisical:8080
+      INFISICAL_CLIENT_ID: ${INFISICAL_APP_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_APP_CLIENT_SECRET}
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-dev-nextauth-secret}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-nexus-storage}
+      NODE_ENV: ${NODE_ENV:-development}
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Workers ─────────────────────────────────────────────────────
+  nexus-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@db:5432/nexus
+      REDIS_URL: redis://redis:6379/0
+      INFISICAL_SITE_URL: http://infisical:8080
+      INFISICAL_CLIENT_ID: ${INFISICAL_WORKER_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_WORKER_CLIENT_SECRET}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-nexus-storage}
+      NODE_ENV: ${NODE_ENV:-development}
+    deploy:
+      mode: replicated
+      replicas: 2
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Scraper Pool ────────────────────────────────────────────────
+  scraper-pool:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INFISICAL_SITE_URL: http://infisical:8080
+      INFISICAL_CLIENT_ID: ${INFISICAL_SCRAPER_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_SCRAPER_CLIENT_SECRET}
+      PROXY_PROVIDER: ${PROXY_PROVIDER:-iproyal}
+      PROXY_API_KEY: ${PROXY_API_KEY}
+      PROXY_RESIDENTIAL_ENDPOINT: ${PROXY_RESIDENTIAL_ENDPOINT}
+      POOL_SIZE: 8
+      NODE_ENV: ${NODE_ENV:-development}
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+    shm_size: 4gb
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Warming Service ─────────────────────────────────────────────
+  warming-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INFISICAL_SITE_URL: http://infisical:8080
+      INFISICAL_CLIENT_ID: ${INFISICAL_WARMING_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_WARMING_CLIENT_SECRET}
+      PROXY_PROVIDER: ${PROXY_PROVIDER:-iproyal}
+      PROXY_API_KEY: ${PROXY_API_KEY}
+      PROXY_RESIDENTIAL_ENDPOINT: ${PROXY_RESIDENTIAL_ENDPOINT}
+      SERVICE_MODE: warming
+      NODE_ENV: ${NODE_ENV:-development}
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    shm_size: 2gb
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── Media Engine ────────────────────────────────────────────────
+  media-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.media
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      INFISICAL_SITE_URL: http://infisical:8080
+      INFISICAL_CLIENT_ID: ${INFISICAL_MEDIA_CLIENT_ID}
+      INFISICAL_CLIENT_SECRET: ${INFISICAL_MEDIA_CLIENT_SECRET}
+      PROXY_PROVIDER: ${PROXY_PROVIDER:-iproyal}
+      PROXY_API_KEY: ${PROXY_API_KEY}
+      PROXY_DATACENTER_ENDPOINT: ${PROXY_DATACENTER_ENDPOINT}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID}
+      R2_ACCESS_KEY_ID: ${R2_ACCESS_KEY_ID}
+      R2_SECRET_ACCESS_KEY: ${R2_SECRET_ACCESS_KEY}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-nexus-storage}
+      NODE_ENV: ${NODE_ENV:-development}
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 8G
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # ── ML Sidecar (Python) ────────────────────────────────────────
+  ml-sidecar:
+    build:
+      context: ./services/ml-sidecar
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@db:5432/nexus
+      REDIS_URL: redis://redis:6379/0
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ── Scrapling Sidecar (Python) ──────────────────────────────────
+  scrapling-sidecar:
+    build:
+      context: ./services/scrapling-sidecar
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8002:8000"
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      PROXY_PROVIDER: ${PROXY_PROVIDER:-iproyal}
+      PROXY_API_KEY: ${PROXY_API_KEY}
+      PROXY_RESIDENTIAL_ENDPOINT: ${PROXY_RESIDENTIAL_ENDPOINT}
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 2G
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  infisical_pgdata:
