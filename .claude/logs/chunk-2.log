@@ -1,0 +1,9 @@
+Chunk 2 complete. Files created/modified:
+
+- **`src/server/api/routers/dashboard.ts`** — `getWorkflowStats` (stub), `getSpendSummary` (real, calls llm-budget), `getRecentPosts` (stub), `getAccountHealth` (real, queries OrgPlatformToken)
+- **`src/server/api/routers/settings.ts`** — `getOrgDetails`, `updateOrgDetails` (name/slug with slug conflict check), `listPlatformTokens` (with health indicators), `updateBrandConfig` (JSON)
+- **`src/server/api/root.ts`** — registered `dashboard` + `settings` routers
+- **`src/app/dashboard/page.tsx`** — workflow stats grid, LLM spend bar, account health grid, recent posts timeline
+- **`src/app/settings/page.tsx`** — org details form, platform connections list, brand config JSON editor
+
+All procedures use `onboardedProcedure`. `tsc` unavailable (worktree has no node_modules, npm install fails on next-auth version). CLAUDE.md updated to Chunk 2/4 done.
