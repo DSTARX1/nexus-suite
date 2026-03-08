@@ -1,0 +1,5 @@
+Plan issue created: **#28** — 3 chunks:
+
+1. **Project config** — tsconfig.json, next.config.ts, .gitignore, .env
+2. **Dockerfiles** — multi-stage Dockerfile (base/app/worker), Dockerfile.scraper, Dockerfile.media
+3. **Worker entry point + validation** — pg-boss worker, job types, tsc/compose validation
