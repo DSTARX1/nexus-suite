@@ -46,20 +46,18 @@ export async function storeSecret(
 
   try {
     // Try update first
-    await sdk.secrets().updateSecret({
+    await sdk.secrets().updateSecret(secretName, {
       projectId,
       environment,
       secretPath,
-      secretName,
       secretValue,
     });
   } catch {
     // Create if doesn't exist
-    await sdk.secrets().createSecret({
+    await sdk.secrets().createSecret(secretName, {
       projectId,
       environment,
       secretPath,
-      secretName,
       secretValue,
     });
   }
