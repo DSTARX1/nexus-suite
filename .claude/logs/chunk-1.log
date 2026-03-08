@@ -1,5 +1,9 @@
-Chunk 1 done. Added `analysis Json?` and `analyzedAt DateTime?` to `TrackedPost` in `prisma/schema.prisma`. Prisma client regenerated, typecheck passes clean.
+Chunk 1 done. Typecheck passes.
 
-Note: `prisma migrate dev` requires a live DB connection — migration file will be created when run against the actual database.
+**What was built:**
 
-Phase 1 done. Resume: `gh issue view 72`, execute Chunk 2. Files: `prisma/schema.prisma`, `src/server/workers/competitor-worker.ts`. Issues: none.
+- **`handlers/content-publish.ts`** — resolves `contentId` → SourceVideo + ready variations, finds eligible accounts by `platformIds` (excluding OPEN circuit), creates PostRecord per account, calls `postContent()` immediately
+- **`handlers/content-schedule.ts`** — same content/account resolution, but creates PostRecord with future `scheduledAt` and enqueues `post:task` via `boss.send()` with `startAfter` (same pattern as distribution-scheduler)
+- **`jobs/index.ts`** — replaced generic loop with specific handler dispatch for CONTENT_PUBLISH and CONTENT_SCHEDULE; remaining 5 job types stay stubbed
+
+Phase 1 done. Resume: `gh issue view 76`, execute Chunk 2. Files: `src/server/worker/jobs/index.ts`, `src/server/worker/jobs/handlers/content-publish.ts`, `src/server/worker/jobs/handlers/content-schedule.ts`. Issues: none.
