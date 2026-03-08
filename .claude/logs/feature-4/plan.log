@@ -1,0 +1,7 @@
+Plan issue created: https://github.com/R3LAMP4GO/nexus-suite/issues/18
+
+4 chunks:
+1. **Service scaffold + AgentPool** — package.json, tsconfig, entrypoint, 8-context pool w/ semaphore
+2. **Rate limiting, proxy rotation, fingerprint rotation** — Redis token bucket, sticky proxy, 50-task fingerprint recycling
+3. **Bypass decision chain** — plain HTTP → Patchright+Turnstile → reCAPTCHA audio → Camoufox → Scrapling sidecar + CF cookie cache
+4. **Queue consumer + streaming + Dockerfile** — pg-boss `scrape:task` consumer, Redis pub/sub progress, multi-stage Dockerfile
