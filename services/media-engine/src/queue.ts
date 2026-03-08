@@ -2,12 +2,13 @@ import PgBoss from "pg-boss";
 import { uploadToR2 } from "./r2.js";
 import { download } from "./download.js";
 import { runPipeline, runRaw } from "./ffmpeg.js";
+import { ensureAudioSafe, type AudioAnalysis } from "./audio-safety.js";
 import type { TransformConfig, TransformFragment } from "./transforms.js";
 
 const QUEUE_NAME = "media:task";
 
 export interface MediaJob {
-  type: "download" | "transform";
+  type: "download" | "transform" | "audio-check";
   organizationId: string;
   sourceUrl?: string;
   localPath?: string;
@@ -19,6 +20,8 @@ export interface MediaJobResult {
   success: boolean;
   r2Key?: string;
   error?: string;
+  audioAnalysis?: AudioAnalysis;
+  audioStripped?: boolean;
 }
 
 async function handleDownload(job: MediaJob): Promise<MediaJobResult> {
@@ -48,12 +51,36 @@ async function handleTransform(job: MediaJob): Promise<MediaJobResult> {
   return { success: true, r2Key: upload.key };
 }
 
+async function handleAudioCheck(job: MediaJob): Promise<MediaJobResult> {
+  const { localPath, outputKey } = job;
+  if (!localPath) {
+    return { success: false, error: "localPath required for audio-check job" };
+  }
+
+  const result = await ensureAudioSafe(localPath);
+  let r2Key: string | undefined;
+
+  if (result.audioStripped && outputKey) {
+    const upload = await uploadToR2(result.outputPath, outputKey);
+    r2Key = upload.key;
+  }
+
+  return {
+    success: true,
+    r2Key,
+    audioAnalysis: result.analysis,
+    audioStripped: result.audioStripped,
+  };
+}
+
 async function processJob(job: MediaJob): Promise<MediaJobResult> {
   switch (job.type) {
     case "download":
       return handleDownload(job);
     case "transform":
       return handleTransform(job);
+    case "audio-check":
+      return handleAudioCheck(job);
     default:
       return { success: false, error: `unknown job type: ${(job as MediaJob).type}` };
   }

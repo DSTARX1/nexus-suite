@@ -5,6 +5,7 @@ import type { WorkflowContext } from "./control-flow";
 import { trackLlmSpend } from "../services/llm-budget";
 import { CLIENT_PLUGIN_WHITELIST } from "@/agents/general/prepare-context";
 import type { WrappedToolResult } from "@/agents/general/cli-tool-wrappers";
+import type { AudioAnalysis } from "../../../services/media-engine/src/audio-safety";
 
 // AsyncLocalStorage to thread WorkflowContext through agent tool execution
 const workflowContextStorage = new AsyncLocalStorage<WorkflowContext>();
@@ -152,6 +153,25 @@ async function resolveAgent(agentName: string, orgId: string): Promise<ResolvedA
   // 4. Global registry fallback
   const agent = agentRegistry.get(agentName);
   return agent ? { entry: agent, isClientPlugin: false } : null;
+}
+
+/**
+ * Delegate to sound-selector sub-agent with audio analysis context.
+ * Called when audio was stripped so the agent can recommend royalty-free replacements.
+ */
+export async function delegateSoundSelector(
+  context: WorkflowContext,
+  audioAnalysis: AudioAnalysis,
+  platform: string,
+): Promise<unknown> {
+  const prompt = [
+    `Audio was stripped from content due to likely copyrighted music.`,
+    `Platform: ${platform}`,
+    `Original audio profile: loudness=${audioAnalysis.integratedLoudness} LUFS, range=${audioAnalysis.loudnessRange} LU, silence=${(audioAnalysis.silenceRatio * 100).toFixed(1)}%.`,
+    `Suggest royalty-free replacement audio that matches the original energy and is suitable for ${platform}.`,
+  ].join("\n");
+
+  return executeAgentDelegate("sound-selector", prompt, context);
 }
 
 export async function executeAgentDelegate(

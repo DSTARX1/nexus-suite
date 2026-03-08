@@ -79,7 +79,7 @@ function comboKey(combo: VariationCombo): string {
   ].join("|");
 }
 
-function generateOneCombo(): VariationCombo {
+function generateOneCombo(audioStripped = false): VariationCombo {
   // Pick 2-3 visual transforms
   const numVisual = randInt(2, 3);
   const visualPicks = shuffle(VISUAL_POOL).slice(0, numVisual);
@@ -89,13 +89,16 @@ function generateOneCombo(): VariationCombo {
     Object.assign(layer2, v.gen());
   }
 
-  // Pick 1-2 audio transforms
-  const numAudio = randInt(1, 2);
-  const audioPicks = shuffle(AUDIO_POOL).slice(0, numAudio);
-  const audioNames = audioPicks.map((a) => a.name);
-  const layer3: Partial<Layer3Options> = {};
-  for (const a of audioPicks) {
-    Object.assign(layer3, a.gen());
+  // Skip Layer 3 audio transforms when audio was stripped — no point pitch-shifting silence
+  let audioNames: string[] = [];
+  let layer3: Partial<Layer3Options> = {};
+  if (!audioStripped) {
+    const numAudio = randInt(1, 2);
+    const audioPicks = shuffle(AUDIO_POOL).slice(0, numAudio);
+    audioNames = audioPicks.map((a) => a.name);
+    for (const a of audioPicks) {
+      Object.assign(layer3, a.gen());
+    }
   }
 
   // Structural params — always unique CRF + preset combo
@@ -120,7 +123,11 @@ function generateOneCombo(): VariationCombo {
  * Generate `count` unique variation combos.
  * Retries if any combo duplicates another (by combo key).
  */
-export function generateVariationCombos(count: number, maxRetries = 50): VariationCombo[] {
+export function generateVariationCombos(
+  count: number,
+  maxRetries = 50,
+  audioStripped = false,
+): VariationCombo[] {
   const combos: VariationCombo[] = [];
   const usedKeys = new Set<string>();
 
@@ -129,7 +136,7 @@ export function generateVariationCombos(count: number, maxRetries = 50): Variati
     let retries = 0;
 
     while (retries < maxRetries) {
-      const candidate = generateOneCombo();
+      const candidate = generateOneCombo(audioStripped);
       const key = comboKey(candidate);
 
       if (!usedKeys.has(key)) {
@@ -141,8 +148,7 @@ export function generateVariationCombos(count: number, maxRetries = 50): Variati
     }
 
     if (!combo) {
-      // Fallback: accept a combo even if key matches (params will still differ numerically)
-      combo = generateOneCombo();
+      combo = generateOneCombo(audioStripped);
     }
 
     combos.push(combo);
@@ -158,18 +164,19 @@ export function regenerateCombo(
   combos: VariationCombo[],
   index: number,
   maxRetries = 50,
+  audioStripped = false,
 ): VariationCombo {
   const usedKeys = new Set(
     combos.filter((_, i) => i !== index).map(comboKey),
   );
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const candidate = generateOneCombo();
+    const candidate = generateOneCombo(audioStripped);
     if (!usedKeys.has(comboKey(candidate))) {
       return candidate;
     }
   }
 
   // Fallback
-  return generateOneCombo();
+  return generateOneCombo(audioStripped);
 }

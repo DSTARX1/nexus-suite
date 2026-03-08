@@ -3,12 +3,14 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { stat } from "node:fs/promises";
 import { type TransformFragment, type TransformConfig, composeTransforms } from "./transforms.js";
+import { ensureAudioSafe } from "./audio-safety.js";
 
 const TMP_DIR = "/tmp";
 
 export interface FfmpegResult {
   outputPath: string;
   size: number;
+  audioStripped?: boolean;
 }
 
 function exec(cmd: string, args: string[]): Promise<string> {
@@ -80,15 +82,18 @@ export async function runPipeline(
   inputPath: string,
   config?: TransformConfig,
 ): Promise<FfmpegResult> {
+  const safeResult = await ensureAudioSafe(inputPath);
+  const effectiveInput = safeResult.outputPath;
+
   const fragment = composeTransforms(config);
-  const ext = inputPath.split(".").pop() ?? "mp4";
+  const ext = effectiveInput.split(".").pop() ?? "mp4";
   const outputPath = join(TMP_DIR, `ffout-${randomUUID().slice(0, 8)}.${ext}`);
 
-  const args = buildArgs(inputPath, outputPath, fragment);
+  const args = buildArgs(effectiveInput, outputPath, fragment);
   await exec("ffmpeg", args);
 
   const fileStat = await stat(outputPath);
-  return { outputPath, size: fileStat.size };
+  return { outputPath, size: fileStat.size, audioStripped: safeResult.audioStripped };
 }
 
 /**
