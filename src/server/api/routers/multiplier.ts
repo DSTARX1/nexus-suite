@@ -1,7 +1,9 @@
 import { z } from "zod";
 import { createTRPCRouter, onboardedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { Platform } from "@prisma/client";
+import { Platform, Prisma } from "@prisma/client";
+import { composeTransforms } from "../../../../services/media-engine/src/transforms.js";
+import { sendMediaJob } from "@/server/services/media-queue";
 
 async function assertMultiplierEnabled(ctx: { db: any; organizationId: string }) {
   const org = await ctx.db.organization.findUnique({
@@ -48,23 +50,36 @@ export const multiplierRouter = createTRPCRouter({
 
       const sourceVideo = await ctx.db.sourceVideo.findUnique({
         where: { id: input.sourceVideoId },
-        select: { organizationId: true },
+        select: { organizationId: true, url: true },
       });
       if (!sourceVideo || sourceVideo.organizationId !== ctx.organizationId) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Source video not found" });
       }
 
       const variations = await ctx.db.$transaction(
-        Array.from({ length: input.count }, (_, i) =>
-          ctx.db.videoVariation.create({
+        Array.from({ length: input.count }, (_, i) => {
+          const transforms = composeTransforms();
+          return ctx.db.videoVariation.create({
             data: {
               sourceVideoId: input.sourceVideoId,
               variationIndex: i,
-              transforms: {},
+              transforms: transforms as unknown as Prisma.InputJsonValue,
               fileHash: "",
               pHash: "",
               status: "PENDING",
             },
+          });
+        }),
+      );
+
+      await Promise.all(
+        variations.map((v: any) =>
+          sendMediaJob({
+            type: "transform",
+            organizationId: ctx.organizationId,
+            sourceUrl: sourceVideo.url,
+            transforms: v.transforms as Record<string, unknown>,
+            outputKey: `variations/${v.id}`,
           }),
         ),
       );

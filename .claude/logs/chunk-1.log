@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 Chunk 1 done. `getWorkflowStats` now queries `PostRecord.groupBy({ by: ['status'] })` and maps `POSTING→active`, `SUCCESS→completed`, `FAILED→failed`, `SCHEDULED→queued`. TypeCheck passes clean.
 
 Phase 1 done. Resume: `gh issue view 47`, execute Chunk 2. Files: `src/server/api/routers/dashboard.ts`. Issues: none.
@@ -13,3 +14,8 @@ Chunk 1 done. Changes in `src/server/api/routers/competitors.ts`:
 
 Phase 1 done. Resume: `gh issue view 49`, execute Chunk 2. Files: `src/server/api/routers/competitors.ts`. Issues: none.
 >>>>>>> feature-33
+=======
+Chunk 1 done. Created `src/server/services/media-queue.ts` — pg-boss singleton + `sendMediaJob()` sender for `media:task` queue. Mirrors the pattern from `distribution-scheduler.ts` and `warming/queue.ts`. Typecheck passes clean.
+
+Phase 1 done. Resume: `gh issue view 48`, execute Chunk 2. Files: `src/server/services/media-queue.ts`. Issues: none.
+>>>>>>> feature-34
