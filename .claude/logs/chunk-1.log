@@ -1,9 +1,8 @@
-Chunk 1 done. Created `src/server/services/platform-apis/linkedin.ts` with:
+Chunk 1 done. Created:
 
-- **Mock mode**: returns `mock_linkedin_{uuid}` when `MOCK_PLATFORM_APIS=true`
-- **3-step LinkedIn Marketing API flow**:
-  1. Register upload → gets asset URN + upload URL
-  2. PUT binary to upload URL with `application/octet-stream`
-  3. POST `/v2/ugcPosts` with asset, caption as commentary, visibility PUBLIC
-- **Signature**: `postLinkedInApi(accessToken, variation)` — matches YouTube/TikTok pattern
-- Typecheck passes clean
+- **`src/components/ui/modal.tsx`** — Reusable `Modal` with `open`, `onClose`, `title`, `children`, optional `maxWidth` props. Matches the overlay+card pattern from competitors page.
+- **`src/components/ui/form-field.tsx`** — Reusable `FormField` with `label`, `children` (input slot), optional `error` and `required` props. Matches the label+input+error pattern from settings/onboarding.
+
+Typecheck passes. Phase line updated in CLAUDE.md.
+
+Phase 1 done. Resume: `gh issue view 56`, execute Chunk 2. Files: `src/components/ui/modal.tsx`, `src/components/ui/form-field.tsx`. Issues: none.
