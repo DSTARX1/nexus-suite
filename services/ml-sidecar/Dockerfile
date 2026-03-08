@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN chown -R mluser:mluser /app
+RUN chown -R mluser:mluser /app && mkdir -p /models && chown mluser:mluser /models
 
 USER mluser
 

@@ -76,3 +76,33 @@ No TS to check (Python-only scope). CLAUDE.md updated to Chunk 3/3 done.
 [0;32m✓ Chunk 3 done[0m
 [0;36m  Quality gate after chunk 3...[0m
 [0;32m  ✓ Passed[0m
+[r3lamp4go/feature-13 a8a69291] checkpoint: chunk 3 — Scrapling Sidecar service (full)
+ 7 files changed, 361 insertions(+), 1 deletion(-)
+ create mode 100644 .claude/logs/chunk-3.log
+ create mode 100644 .claude/logs/gate-3.log
+ create mode 100644 services/scrapling-sidecar/Dockerfile
+ create mode 100644 services/scrapling-sidecar/main.py
+ create mode 100644 services/scrapling-sidecar/requirements.txt
+[0;32m  ✓ Checkpoint commit[0m
+https://github.com/R3LAMP4GO/nexus-suite/issues/27
+[0;32m  ✓ Issue #27: Chunk 3 checked off[0m
+
+[0;32m══════════════════════════════════════════════════════[0m
+[0;32m  All chunks complete![0m
+[0;32m══════════════════════════════════════════════════════[0m
+
+[0;34mClosing plan issue #27...[0m
+[0;32m✓ Issue #27 closed[0m
+[0;34mFinal quality checks...[0m
+
+[41m                                                                               [0m
+[41m[37m                This is not the tsc command you are looking for                [0m
+[41m                                                                               [0m
+
+To get access to the TypeScript compiler, [34mtsc[0m, from the command line either:
+
+- Use [1mnpm install typescript[0m to first add TypeScript to your project [1mbefore[0m using npx
+- Use [1myarn[0m to avoid accidentally running code from un-installed packages
+[0;32m✓ All passed[0m
+
+[0;32mDone![0m git diff → /save → /hp

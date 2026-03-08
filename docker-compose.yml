@@ -229,6 +229,8 @@ services:
         limits:
           cpus: "2"
           memory: 4G
+    volumes:
+      - ml_models:/models
     depends_on:
       db:
         condition: service_healthy
@@ -261,3 +263,4 @@ volumes:
   pgdata:
   redisdata:
   infisical_pgdata:
+  ml_models:
