@@ -1,8 +1,17 @@
-Chunk 3 done. Typecheck passes clean.
+Chunk 3/3 done. Summary of changes:
 
-**What was built** in `competitor-worker.ts`:
-- `reproducePost()` — fetches analysis from DB, chains script-agent → caption-writer → variation-orchestrator → `sendMediaJob()` → marks `reproduced = true`
-- Replaced reproduce stub in worker switch with `reproducePost()` call
-- Added imports for all 3 agents + `sendMediaJob`
+**New handlers:**
+- `analytics-sync.ts` — resolves platform account, fetches credentials via Infisical fetch-use-discard, calls platform analytics API. Storage deferred until `AnalyticsMetric` model lands.
+- `webhook-dispatch.ts` — POSTs payload with exponential backoff (3 retries, 1s base), 10s timeout per attempt.
 
-**Pipeline flow:** analyze must run first (guards with error), then reproduce fetches stored analysis JSON, feeds it through 3 agents sequentially, parses FFmpeg transforms, queues `media:task`, marks post reproduced.
+**Wiring:**
+- `jobs/index.ts` — registered both new handlers, kept `MEDIA_PROCESS` as lone stub.
+
+**BullMQ cleanup:**
+- `worker/index.ts` — removed `Worker` import, `bullWorkers` array, orphaned `"default"` queue worker, `REDIS_URL` check, and BullMQ close loop.
+
+**Typecheck:** clean (`tsc --noEmit` passes).
+queue worker, REDIS_URL check, BullMQ close loop
+
+### Typecheck
+- tsc --noEmit: PASS (fixed fetchSecret 4-arg signature)

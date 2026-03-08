@@ -9,7 +9,7 @@ Full plan in `@ARCHITECTURE.md` — all decisions (1-10), implementation phases,
 - Docker Compose (10 services)
 - Infisical (secrets), Cloudflare R2 (storage)
 - Patchright (stealth browser), FFmpeg (media processing)
-- pg-boss + BullMQ (job queues)
+- pg-boss (job queues), BullMQ (specialized workers)
 
 ## Conventions
 - Onion architecture: domain → repos → services → modules → api → app
@@ -19,7 +19,7 @@ Full plan in `@ARCHITECTURE.md` — all decisions (1-10), implementation phases,
 - Client plugins: `src/agents/clients/{org_id}/` — no direct Infisical access
 
 ## Current Phase
-**Phase:** build - Chunk 2/3 done - #76
+**Phase:** build - Chunk 3/3 done - #76
 
 ## Commands
 - `docker compose up -d` — start all 10 services

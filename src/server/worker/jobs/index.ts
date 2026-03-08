@@ -1,10 +1,12 @@
 import type PgBoss from "pg-boss";
 import { JobType } from "./types.js";
-import type { JobData, ContentPublishJob, ContentScheduleJob, ScraperRunJob, AgentExecuteJob } from "./types.js";
+import type { JobData, ContentPublishJob, ContentScheduleJob, ScraperRunJob, AgentExecuteJob, AnalyticsSyncJob, WebhookDispatchJob } from "./types.js";
 import { handleContentPublish } from "./handlers/content-publish.js";
 import { handleContentSchedule } from "./handlers/content-schedule.js";
 import { handleScraperRun } from "./handlers/scraper-run.js";
 import { handleAgentExecute } from "./handlers/agent-execute.js";
+import { handleAnalyticsSync } from "./handlers/analytics-sync.js";
+import { handleWebhookDispatch } from "./handlers/webhook-dispatch.js";
 
 export function registerJobHandlers(boss: PgBoss): void {
   // CONTENT_PUBLISH — immediate publish to platforms
@@ -39,21 +41,28 @@ export function registerJobHandlers(boss: PgBoss): void {
     }
   });
 
-  // Remaining job types — stub handlers for now
-  const stubTypes = [
-    JobType.MEDIA_PROCESS,
-    JobType.ANALYTICS_SYNC,
-    JobType.WEBHOOK_DISPATCH,
-  ];
+  // ANALYTICS_SYNC — fetch platform metrics
+  boss.work<AnalyticsSyncJob>(JobType.ANALYTICS_SYNC, async (jobs) => {
+    for (const job of jobs) {
+      console.log(`[worker] processing ${JobType.ANALYTICS_SYNC} job=${job.id}`);
+      await handleAnalyticsSync(job);
+    }
+  });
 
-  for (const jobType of stubTypes) {
-    boss.work<JobData>(jobType, async (jobs) => {
-      for (const job of jobs) {
-        console.log(`[worker] processing ${jobType} job=${job.id}`);
-        // Job handlers will be implemented in later chunks
-      }
-    });
-  }
+  // WEBHOOK_DISPATCH — POST payload with exponential backoff
+  boss.work<WebhookDispatchJob>(JobType.WEBHOOK_DISPATCH, async (jobs) => {
+    for (const job of jobs) {
+      console.log(`[worker] processing ${JobType.WEBHOOK_DISPATCH} job=${job.id}`);
+      await handleWebhookDispatch(job);
+    }
+  });
+
+  // MEDIA_PROCESS — stub, not in scope for this feature
+  boss.work<JobData>(JobType.MEDIA_PROCESS, async (jobs) => {
+    for (const job of jobs) {
+      console.log(`[worker] processing ${JobType.MEDIA_PROCESS} job=${job.id}`);
+    }
+  });
 }
 
 export { JobType } from "./types.js";

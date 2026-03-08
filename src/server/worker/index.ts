@@ -1,19 +1,14 @@
 import PgBoss from "pg-boss";
-import { Worker } from "bullmq";
 import { registerJobHandlers } from "./jobs/index.js";
 import { startCompetitorWorker, stopCompetitorWorker } from "../workers/competitor-worker.js";
 import { startPostWorker, stopPostWorker } from "../workers/post-worker.js";
 import { startCompetitorPollingWorker, stopCompetitorPollingWorker } from "../workers/competitor-polling-worker.js";
 
 const DATABASE_URL = process.env.DATABASE_URL;
-const REDIS_URL = process.env.REDIS_URL;
 
 if (!DATABASE_URL) throw new Error("DATABASE_URL is required");
-if (!REDIS_URL) throw new Error("REDIS_URL is required");
 
 const boss = new PgBoss(DATABASE_URL);
-
-const bullWorkers: Worker[] = [];
 
 async function start(): Promise<void> {
   console.log("[worker] starting pg-boss...");
@@ -29,24 +24,11 @@ async function start(): Promise<void> {
   console.log("[worker] starting competitor polling worker...");
   await startCompetitorPollingWorker();
 
-  console.log("[worker] connecting to Redis for BullMQ...");
-  const bullWorker = new Worker(
-    "default",
-    async (job: { id?: string; name: string }) => {
-      console.log(`[worker] bullmq job=${job.id} name=${job.name}`);
-    },
-    { connection: { url: REDIS_URL } },
-  );
-  bullWorkers.push(bullWorker);
-
   console.log("[worker] ready");
 }
 
 async function shutdown(): Promise<void> {
   console.log("[worker] shutting down...");
-  for (const w of bullWorkers) {
-    await w.close();
-  }
   await stopCompetitorWorker();
   await stopCompetitorPollingWorker();
   await stopPostWorker();
