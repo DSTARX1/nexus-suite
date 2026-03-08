@@ -1,4 +1,18 @@
-FROM node:22-slim AS base
+FROM node:22-slim AS build
+
+WORKDIR /app
+
+COPY services/media-engine/package.json services/media-engine/package-lock.json* ./
+RUN npm ci
+
+COPY services/media-engine/tsconfig.json ./
+COPY services/media-engine/src ./src
+
+RUN ./node_modules/.bin/tsc
+
+# ── Runtime stage ────────────────────────────────────────────────
+
+FROM node:22-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
@@ -16,9 +30,6 @@ WORKDIR /app
 COPY services/media-engine/package.json services/media-engine/package-lock.json* ./
 RUN npm ci --omit=dev
 
-COPY services/media-engine/tsconfig.json ./
-COPY services/media-engine/src ./src
-
-RUN npx tsc
+COPY --from=build /app/dist ./dist
 
 CMD ["node", "dist/index.js"]
