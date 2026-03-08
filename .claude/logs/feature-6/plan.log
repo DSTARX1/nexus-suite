@@ -1,0 +1,6 @@
+Plan issue created: https://github.com/R3LAMP4GO/nexus-suite/issues/20
+
+3 chunks:
+1. **Core Infrastructure** — entry point, session manager (R2+Infisical encryption), Redis health tracker, pg-boss `warm:task` consumer
+2. **Executor + Verification** — Patchright automation w/ fingerprint+proxy injection, humancursor patterns, IMAP/SMS verification code catching
+3. **Warming Workflow YAML + CLI** — 4-phase YAML workflow definition, `warmup-start` CLI command, wiring

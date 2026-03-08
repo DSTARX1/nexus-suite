@@ -1,0 +1,100 @@
+# 4-Phase Account Warming Workflow
+# Gradually ramps account activity to avoid detection.
+# Each phase enqueues pg-boss jobs with randomized startAfter delays.
+
+name: warming-workflow
+description: "4-phase account warming: passive → engagement → posting → production-ready"
+organizationId: "{{input.organizationId}}"
+trigger:
+  type: manual
+config:
+  platform: "{{input.platform}}"
+input:
+  accountId: "Account ID to warm"
+  organizationId: "Organization ID"
+  platform: "Platform (TIKTOK, INSTAGRAM)"
+
+steps:
+  # ── Phase 1: Passive Browsing (Days 1-3) ──────────────────────
+  - id: phase-1-scroll-feed
+    type: action
+    action: warming.enqueuePhase
+    params:
+      accountId: "{{input.accountId}}"
+      organizationId: "{{input.organizationId}}"
+      phase: 1
+      dayStart: 0
+      dayEnd: 3
+      sessionsPerDay: 2
+      actions:
+        - action: scroll-feed
+          weight: 3
+        - action: watch-video
+          weight: 5
+    retries: 1
+    timeoutMs: 30000
+
+  # ── Phase 2: Light Engagement (Days 4-7) ──────────────────────
+  - id: phase-2-engagement
+    type: action
+    action: warming.enqueuePhase
+    dependsOn:
+      - phase-1-scroll-feed
+    params:
+      accountId: "{{input.accountId}}"
+      organizationId: "{{input.organizationId}}"
+      phase: 2
+      dayStart: 3
+      dayEnd: 7
+      sessionsPerDay: 3
+      actions:
+        - action: scroll-feed
+          weight: 2
+        - action: watch-video
+          weight: 3
+        - action: like-post
+          weight: 4
+        - action: follow-account
+          weight: 2
+        - action: post-comment
+          weight: 1
+    retries: 1
+    timeoutMs: 30000
+
+  # ── Phase 3: First Posts (Days 8-10) ──────────────────────────
+  - id: phase-3-posting
+    type: action
+    action: warming.enqueuePhase
+    dependsOn:
+      - phase-2-engagement
+    params:
+      accountId: "{{input.accountId}}"
+      organizationId: "{{input.organizationId}}"
+      phase: 3
+      dayStart: 7
+      dayEnd: 10
+      sessionsPerDay: 3
+      actions:
+        - action: scroll-feed
+          weight: 2
+        - action: like-post
+          weight: 3
+        - action: follow-account
+          weight: 1
+        - action: post-comment
+          weight: 2
+        - action: post-video
+          weight: 1
+    retries: 1
+    timeoutMs: 30000
+
+  # ── Phase 4: Production Ready (Day 11+) ──────────────────────
+  - id: phase-4-ready
+    type: action
+    action: warming.markReady
+    dependsOn:
+      - phase-3-posting
+    params:
+      accountId: "{{input.accountId}}"
+    retries: 2
+    timeoutMs: 15000

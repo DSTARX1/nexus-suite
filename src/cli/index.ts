@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { provision } from "./commands/provision";
 import { assignProxy } from "./commands/assign-proxy";
 import { generateWorkflows } from "./commands/generate-workflows";
+import { warmupStart } from "./commands/warmup-start";
 
 const program = new Command();
 
@@ -36,6 +37,14 @@ program
   .option("--niche <niche>", "Content niche override (defaults to onboarding submission)")
   .action(async (orgId: string, opts: { niche?: string }) => {
     await generateWorkflows(orgId, opts.niche);
+  });
+
+program
+  .command("warmup-start")
+  .description("Start 4-phase warming schedule for a burner account")
+  .argument("<accountId>", "OrgPlatformToken ID")
+  .action(async (accountId: string) => {
+    await warmupStart(accountId);
   });
 
 program.parse();

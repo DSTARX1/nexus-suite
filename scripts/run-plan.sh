@@ -2,7 +2,7 @@
 set -eo pipefail
 
 # ── CUSTOMIZE THESE (run-chunks fills them in) ──────────────────────────────
-PROJECT_DIR="${WORKTREE_PROJECT_DIR:-/Users/imorgado/nexus-suite/.claude/worktrees/feature-13}"
+PROJECT_DIR="${WORKTREE_PROJECT_DIR:-/Users/imorgado/nexus-suite/.claude/worktrees/feature-6}"
 LOG_DIR="$PROJECT_DIR/.claude/logs"
 CHECK_CMD="npx tsc --noEmit 2>&1 || true"
 

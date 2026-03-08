@@ -1,11 +1,11 @@
-Chunk 3 done. Created 3 files in `services/scrapling-sidecar/`:
+Chunk 3/3 done. Summary of changes:
 
-- **Dockerfile** — Python 3.12 slim, non-root user, healthcheck, uvicorn entrypoint
-- **requirements.txt** — fastapi, uvicorn, redis, httpx, scrapling, lxml
-- **main.py** — Full service with:
-  - `GET /health` — Redis ping
-  - `POST /scrape` — 3-tier fetcher (httpx → StealthFetcher → Fetcher), escalates on block signals/captcha/empty body
-  - `POST /scrape/profile` — fetches page then extracts profile fields via platform-specific CSS selectors (youtube, tiktok, instagram, twitter)
-  - `POST /scrape/posts` — fetches page then extracts post cards via platform-specific selectors
+**New files:**
+- `src/server/workflows/warming-workflow.yaml` — 4-phase warming definition (passive → engagement → posting → ready) using `warming.enqueuePhase` and `warming.markReady` actions with `dependsOn` chaining
+- `src/cli/commands/warmup-start.ts` — CLI command that validates account (SECONDARY + proxy + fingerprint), enqueues pg-boss jobs across 3 phases with randomized `startAfter` schedules (8am-10pm spread), sets `warmupStatus=WARMING`
 
-No TS to check (Python-only scope). CLAUDE.md updated to Chunk 3/3 done.
+**Modified:**
+- `src/cli/index.ts` — registered `warmup-start <accountId>` command
+- `CLAUDE.md` — updated phase to `Chunk 3/3 done`
+
+**tsc note:** `npm install` fails due to `next-auth@^5.0.0` not resolving — no tsc binary available. Manual type verification done against Prisma schema (`WarmupStatus`, `accountType`, `infisicalProxyPath`, `fingerprintProfile`) and existing warming module exports.
