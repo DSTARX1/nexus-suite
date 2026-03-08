@@ -1,29 +1,9 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-Done. Chunk 2 implemented:
+Chunk 2 complete. Summary of changes to `posting.ts`:
 
-- Replaced `getRecentPosts` stub with real `findMany` query joining `variation` (caption) and `account` (accountLabel)
-- Maps results to match frontend shape: `title` from variation caption fallback chain, `platform` as `accountLabel · platform`, `publishedAt` as `postedAt ?? scheduledAt`
-- Typecheck passes clean
-
-**Phase 2/2 done. Resume:** `gh issue view 47`, all chunks complete. Files: `src/server/api/routers/dashboard.ts`, `CLAUDE.md`. Issues: none.
-=======
-Chunk 2 done. Created `src/server/workers/competitor-worker.ts`:
-
-- **pg-boss singleton** — same pattern as `post-worker.ts`
-- **`CompetitorTaskPayload`** — `jobType: "analyze" | "reproduce"`, `postId`, `url`, `organizationId`
-- **Subscribes to `competitor:task`** queue (separate from `scrape:task` to avoid conflicts with scraper-pool)
-- **Stub handlers** — logs receipt for both `analyze` and `reproduce` jobs
-- **Exports `startCompetitorWorker()` / `stopCompetitorWorker()`** — matches post-worker API shape
-- Typecheck passes clean
->>>>>>> feature-33
-=======
-Chunk 2 done. Changes to `src/server/api/routers/multiplier.ts`:
-
-1. **Added imports**: `composeTransforms` from media-engine, `sendMediaJob` from media-queue, `Prisma` for JSON type casting
-2. **`sourceVideo` query**: added `url` to select
-3. **Random transforms**: each variation now gets `composeTransforms()` (all-random params) stored in its `transforms` field
-4. **Queue jobs**: after `$transaction`, fires `Promise.all` sending a `media:task` pg-boss job per variation with `type: "transform"`, `organizationId`, `sourceUrl`, transforms, and `outputKey: variations/{id}`
+1. **Import** `getMetaAuth`, `getVideoUrl`, `isMockMode`, `mockPostResult` from `meta.ts`
+2. **`postViaApi`** — removed redundant `fetchSecret` call (auth now handled per-platform), passes `account` to Instagram/Facebook functions
+3. **`postInstagramApi`** — Graph API Reels two-step: create container via `/{igUserId}/media`, poll `status_code` until `FINISHED`, then publish via `/{igUserId}/media_publish`
+4. **`postFacebookApi`** — Graph API video upload via `/{pageId}/videos` with `file_url` + `description`
+5. Both check `isMockMode()` first — returns mock success without hitting API
 
 Typecheck passes clean.
->>>>>>> feature-34

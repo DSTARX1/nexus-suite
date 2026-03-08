@@ -2,6 +2,7 @@ import { Redis } from "ioredis";
 import { db } from "@/lib/db";
 import { fetchSecret } from "@/lib/infisical";
 import { recordSuccess, recordFailure } from "./circuit-breaker";
+import { getMetaAuth, getVideoUrl, isMockMode, mockPostResult } from "./platform-apis/meta";
 import type { Platform, AccountType } from "@prisma/client";
 
 const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379/0");
@@ -150,23 +151,15 @@ async function postViaApi(
   variation: VariationData,
   platform: Platform,
 ): Promise<PostResult> {
-  // Fetch OAuth tokens from Infisical (fetch-use-discard)
-  const _accessToken = await fetchSecret(
-    INFISICAL_PROJECT_ID,
-    INFISICAL_ENV,
-    account.infisicalSecretPath,
-    "access_token",
-  );
-
   switch (platform) {
     case "YOUTUBE":
       return postYouTubeApi(variation);
     case "TIKTOK":
       return postTikTokApi(variation);
     case "INSTAGRAM":
-      return postInstagramApi(variation);
+      return postInstagramApi(account, variation);
     case "FACEBOOK":
-      return postFacebookApi(variation);
+      return postFacebookApi(account, variation);
     case "X":
       return postXApi(variation);
     case "LINKEDIN":
@@ -191,16 +184,95 @@ async function postTikTokApi(variation: VariationData): Promise<PostResult> {
   return { success: false, errorMessage: "TikTok API posting not yet implemented" };
 }
 
-async function postInstagramApi(variation: VariationData): Promise<PostResult> {
-  // TODO: Meta Graph API — /me/media + /me/media_publish (Reels)
-  void variation;
-  return { success: false, errorMessage: "Instagram API posting not yet implemented" };
+const GRAPH_API = "https://graph.facebook.com/v21.0";
+const CONTAINER_POLL_INTERVAL_MS = 5_000;
+const CONTAINER_POLL_MAX_ATTEMPTS = 60;
+
+async function postInstagramApi(account: AccountData, variation: VariationData): Promise<PostResult> {
+  if (isMockMode()) return mockPostResult();
+
+  if (!variation.r2StorageKey) {
+    return { success: false, errorMessage: "No video file attached to variation" };
+  }
+
+  const auth = await getMetaAuth(account.infisicalSecretPath);
+  const videoUrl = await getVideoUrl(variation.r2StorageKey);
+
+  // Step 1: Create Reels media container
+  const createRes = await fetch(`${GRAPH_API}/${auth.igUserId}/media`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      media_type: "REELS",
+      video_url: videoUrl,
+      caption: variation.caption ?? "",
+      access_token: auth.accessToken,
+    }),
+  });
+  const createData = await createRes.json() as { id?: string; error?: { message: string } };
+  if (!createRes.ok || !createData.id) {
+    return { success: false, errorMessage: createData.error?.message ?? "Failed to create IG media container" };
+  }
+  const containerId = createData.id;
+
+  // Step 2: Poll container until FINISHED
+  for (let i = 0; i < CONTAINER_POLL_MAX_ATTEMPTS; i++) {
+    await new Promise((r) => setTimeout(r, CONTAINER_POLL_INTERVAL_MS));
+    const statusRes = await fetch(
+      `${GRAPH_API}/${containerId}?fields=status_code&access_token=${auth.accessToken}`,
+    );
+    const statusData = await statusRes.json() as { status_code?: string; error?: { message: string } };
+    if (statusData.status_code === "FINISHED") break;
+    if (statusData.status_code === "ERROR") {
+      return { success: false, errorMessage: "IG container processing failed" };
+    }
+    if (i === CONTAINER_POLL_MAX_ATTEMPTS - 1) {
+      return { success: false, errorMessage: "IG container processing timed out" };
+    }
+  }
+
+  // Step 3: Publish
+  const publishRes = await fetch(`${GRAPH_API}/${auth.igUserId}/media_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      creation_id: containerId,
+      access_token: auth.accessToken,
+    }),
+  });
+  const publishData = await publishRes.json() as { id?: string; error?: { message: string } };
+  if (!publishRes.ok || !publishData.id) {
+    return { success: false, errorMessage: publishData.error?.message ?? "Failed to publish IG Reel" };
+  }
+
+  return { success: true, externalPostId: publishData.id };
 }
 
-async function postFacebookApi(variation: VariationData): Promise<PostResult> {
-  // TODO: Meta Graph API — /{page-id}/videos
-  void variation;
-  return { success: false, errorMessage: "Facebook API posting not yet implemented" };
+async function postFacebookApi(account: AccountData, variation: VariationData): Promise<PostResult> {
+  if (isMockMode()) return mockPostResult();
+
+  if (!variation.r2StorageKey) {
+    return { success: false, errorMessage: "No video file attached to variation" };
+  }
+
+  const auth = await getMetaAuth(account.infisicalSecretPath);
+  const fileUrl = await getVideoUrl(variation.r2StorageKey);
+
+  const res = await fetch(`${GRAPH_API}/${auth.pageId}/videos`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      file_url: fileUrl,
+      description: variation.caption ?? "",
+      access_token: auth.accessToken,
+    }),
+  });
+  const data = await res.json() as { id?: string; error?: { message: string } };
+  if (!res.ok || !data.id) {
+    return { success: false, errorMessage: data.error?.message ?? "Failed to upload Facebook video" };
+  }
+
+  return { success: true, externalPostId: data.id };
 }
 
 async function postXApi(variation: VariationData): Promise<PostResult> {
