@@ -1,0 +1,5 @@
+Plan issue created: **#26** — 3 chunks:
+
+1. **Test infra + workflow engine unit tests** — vitest config, mock factories, validator (12 layers), interpolation, control-flow, executor
+2. **LLM budget + fingerprint unit tests** — exact math verification, budget check, Redis atomic increment, OS consistency, uniqueness
+3. **Integration tests** — Stripe webhook (idempotency, lifecycle), auth gate middleware chain, admin router (pagination, guards), onboarding router (upsert, rejection)

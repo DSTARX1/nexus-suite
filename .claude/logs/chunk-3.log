@@ -1,16 +1,1 @@
-Chunk 3 done. Summary:
-
-**Created:**
-- `src/app/api/health/route.ts` — GET returns `{status, checks}` with DB (`SELECT 1`) + Redis (`PING`) connectivity. 200 if all ok, 503 if degraded.
-- `src/app/api/metrics/route.ts` — GET returns Prometheus text format with:
-  - `circuit_breaker_state` gauge (per account, from OrgPlatformToken)
-  - `active_warming_sessions` gauge (count of WARMING tokens)
-  - `llm_spend_cents` gauge (per org, from Redis daily spend keys)
-  - `workflow_runs_total`, `scrape_tasks_total`, `post_attempts_total` — type/help headers declared, values will populate once those DB models exist
-
-**Modified:**
-- `src/middleware.ts` — added `/api/metrics` and `/api/health` to `PUBLIC_ROUTES` for unauthenticated Prometheus scraper + Docker healthcheck access
-
-**Note:** `tsc --noEmit` couldn't run — `next-auth@^5.0.0` not resolvable via npm. Code manually verified against schema types.
-
-Phase 3 done. Resume: `gh issue view 25`, execute chunk 4. Files: `src/app/api/metrics/route.ts`, `src/app/api/health/route.ts`, `src/middleware.ts`. Issues: none.
+/Users/imorgado/nexus-suite/.claude/worktrees/feature-12/scripts/run-plan.sh: line 182: /Users/imorgado/.local/bin/claude: Argument list too long

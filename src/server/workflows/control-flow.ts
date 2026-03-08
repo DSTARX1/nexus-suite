@@ -47,7 +47,7 @@ export async function executeCondition(
     if (context.aborted) break;
     const result = await executor(child, context);
     results.push(result);
-    if (result.outputAs && result.output !== undefined) {
+    if ((child as any).outputAs && result.output !== undefined) {
       context.variables[(child as any).outputAs] = result.output;
     }
   }

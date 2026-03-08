@@ -128,8 +128,8 @@ model Organization {
   setupPaymentIntentId  String?
 
   // Status
-  subscriptionStatus OnboardingStatus @default(PENDING_PAYMENT)
-  onboardingStatus   OnboardingStatus @default(PENDING_PAYMENT)
+  subscriptionStatus SubscriptionStatus @default(INACTIVE)
+  onboardingStatus   OnboardingStatus   @default(PENDING_PAYMENT)
   pricingTier        PricingTier      @default(PRO)
 
   // Feature gates (denormalized from tier for fast checks)

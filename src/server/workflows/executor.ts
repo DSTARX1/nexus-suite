@@ -315,7 +315,7 @@ function buildExecutionWaves(steps: Step[]): Step[][] {
     for (let i = remaining.length - 1; i >= 0; i--) {
       const step = remaining[i];
       const deps = step.dependsOn ?? [];
-      const allDepsMet = deps.every((d) => completed.has(d));
+      const allDepsMet = deps.every((d: string) => completed.has(d));
 
       if (allDepsMet) {
         wave.push(step);

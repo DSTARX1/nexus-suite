@@ -1,11 +1,17 @@
-Chunk 1 complete. Files created:
+Chunk 1 complete. Summary:
 
-- **`src/server/services/sse-broadcaster.ts`** — Redis pub/sub SSE broadcaster with `publishSSE(orgId, type, data)` and `subscribeSSE(orgId)`. Separate Redis connections for pub vs sub (ioredis requirement). Heartbeat every 30s. Supports 5 event types: `workflow_status`, `post_status`, `budget_warning`, `outlier_detected`, `account_health`.
+**Created 7 files:**
+- `tsconfig.json` — Next.js-compatible config with `@/` path alias
+- `vitest.config.ts` — path alias, globals, setup file
+- `src/test/setup.ts` — mock reset before each test
+- `src/test/factories.ts` — factories for Organization, User, OnboardingSubmission, StripeEvent + mock Prisma client
+- `src/server/workflows/validator.test.ts` — 21 tests covering all 12 validation layers
+- `src/server/workflows/interpolation.test.ts` — 10 tests (simple vars, dot-path, array index, JSON serialize, unresolved placeholders, recursive params)
+- `src/server/workflows/control-flow.test.ts` — 10 tests (condition branching, forEach batching, while maxIterations, parallel concurrency, abort respect)
+- `src/server/workflows/executor.test.ts` — 8 tests (wave grouping, deadlock, action retry, LLM budget pre-flight, abort propagation, variable passing)
 
-- **`src/app/api/sse/[orgId]/route.ts`** — Next.js route handler streaming SSE. Auth-gated (checks session exists + `session.organizationId === orgId`). Cleans up subscriber on client disconnect via `AbortSignal`.
+**Results:** 49/49 tests passing. TSC errors are pre-existing (ungenerated Prisma client, unrelated source files).
 
-- **No middleware change needed** — `/api/sse` is not in `PUBLIC_ROUTES`, so it already requires auth through the existing middleware flow. The route handler does its own session + orgId verification.
+**Also fixed:** `next-auth` version specifier (`^5.0.0` → `^5.0.0-beta.30`) to unblock dependency resolution.
 
-Couldn't run `tsc --noEmit` — deps not installable in worktree (`next-auth@^5.0.0` resolution issue). Code follows existing patterns exactly (Redis from ioredis, auth from `@/server/auth/config`).
-
-Phase 1 done. Resume: `gh issue view 25`, execute Chunk 2. Files: `src/server/services/sse-broadcaster.ts`, `src/app/api/sse/[orgId]/route.ts`. Issues: none.
+Phase 1 done. Resume: `gh issue view 26`, execute Chunk 2. Files: `src/server/services/llm-budget.ts`, `src/lib/fingerprint.ts`. Issues: none.
