@@ -3,6 +3,10 @@ import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { generate as viralTeardown } from "@/agents/specialists/viral-teardown-agent";
+import { generate as scriptAgent } from "@/agents/specialists/script-agent";
+import { generate as captionWriter } from "@/agents/specialists/caption-writer";
+import { generate as variationOrchestrator } from "@/agents/specialists/variation-orchestrator";
+import { sendMediaJob } from "@/server/services/media-queue";
 import type { RawAgentContext } from "@/agents/general/types";
 
 // ── Types ─────────────────────────────────────────────────────
@@ -113,6 +117,71 @@ async function analyzePost(
   console.log(`[competitor-worker] analysis saved for postId=${postId}`);
 }
 
+// ── Reproduce pipeline ───────────────────────────────────────
+
+async function reproducePost(
+  postId: string,
+  url: string,
+  organizationId: string,
+): Promise<void> {
+  const post = await db.trackedPost.findUniqueOrThrow({
+    where: { id: postId },
+    select: { analysis: true, analyzedAt: true },
+  });
+
+  if (!post.analyzedAt || !post.analysis) {
+    throw new Error(`postId=${postId} not analyzed yet — run analyze first`);
+  }
+
+  const analysisJson = JSON.stringify(post.analysis);
+  const baseContext: RawAgentContext = { organizationId, userPrompt: "" };
+
+  // 1. Script agent
+  const scriptResult = await scriptAgent(
+    `Write a video script based on this viral teardown analysis:\n\n${analysisJson}`,
+    { ...baseContext, userPrompt: "Generate script from analysis" },
+  );
+  console.log(`[competitor-worker] script-agent done for postId=${postId}`);
+
+  // 2. Caption writer
+  const captionResult = await captionWriter(
+    `Write a caption for this script and analysis:\n\nScript: ${scriptResult.text}\n\nAnalysis: ${analysisJson}`,
+    { ...baseContext, userPrompt: "Generate caption from script + analysis" },
+  );
+  console.log(`[competitor-worker] caption-writer done for postId=${postId}`);
+
+  // 3. Variation orchestrator → FFmpeg transforms
+  const variationResult = await variationOrchestrator(
+    `Generate FFmpeg transform variations for this script:\n\n${scriptResult.text}`,
+    { ...baseContext, userPrompt: "Generate FFmpeg transforms from script" },
+  );
+  console.log(`[competitor-worker] variation-orchestrator done for postId=${postId}`);
+
+  let transforms: Record<string, unknown>;
+  try {
+    transforms = JSON.parse(variationResult.text) as Record<string, unknown>;
+  } catch {
+    transforms = { raw: variationResult.text };
+  }
+
+  // 4. Queue media:task
+  await sendMediaJob({
+    type: "transform",
+    organizationId,
+    sourceUrl: url,
+    transforms,
+  });
+  console.log(`[competitor-worker] media:task queued for postId=${postId}`);
+
+  // 5. Mark reproduced
+  await db.trackedPost.update({
+    where: { id: postId },
+    data: { reproduced: true },
+  });
+
+  console.log(`[competitor-worker] reproduce complete for postId=${postId}`);
+}
+
 // ── Worker ────────────────────────────────────────────────────
 
 export async function startCompetitorWorker(): Promise<void> {
@@ -135,8 +204,7 @@ export async function startCompetitorWorker(): Promise<void> {
           await analyzePost(b, postId, url, organizationId);
           break;
         case "reproduce":
-          // TODO: implement reproduction pipeline (Chunk 3)
-          console.log(`[competitor-worker] reproduce stub — postId=${postId}`);
+          await reproducePost(postId, url, organizationId);
           break;
       }
     },
