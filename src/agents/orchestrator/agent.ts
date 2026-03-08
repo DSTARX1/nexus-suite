@@ -1,79 +1,111 @@
+// Orchestrator Agent — Tier 1
+// Receives top-level tasks, identifies target platform, delegates to Platform Main Agents.
+// Validates the full delegation chain: Orchestrator → Platform Main → Sub-agent/Specialist.
+
 import { Agent } from "@mastra/core/agent";
-import { prepareContext } from "../general/prepare-context";
-import { buildSystemPrompt } from "../general/prompts";
-import type { RawAgentContext } from "../general/types";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { wrapToolHandler } from "@/agents/general";
+import { prepareContext } from "@/agents/general/prepare-context";
+import { executeAgentDelegate } from "@/server/workflows/agent-delegate";
+import type { WorkflowContext } from "@/server/workflows/control-flow";
 
-const ORCHESTRATOR_INSTRUCTIONS = `You are the Nexus Orchestrator — the top-level routing agent for Nexus Suite.
+const PLATFORM_AGENTS: Record<string, string> = {
+  youtube: "youtube-main",
+  tiktok: "tiktok-main",
+  instagram: "instagram-main",
+  linkedin: "linkedin-main",
+  x: "x-main",
+};
 
-Your role:
-- Classify user intent from their prompt
-- Delegate to the correct platform agent or cross-cutting specialist
-- You do NOT create content directly — you route to the right agent
-
-Platform agents (delegate content tasks to the matching platform):
-- youtube-agent: YouTube content (videos, shorts, thumbnails, SEO)
-- tiktok-agent: TikTok content (short-form video, trends)
-- instagram-agent: Instagram content (reels, stories, posts, carousels)
-- linkedin-agent: LinkedIn content (articles, posts, professional content)
-- x-agent: X/Twitter content (tweets, threads, replies)
-- facebook-agent: Facebook content (posts, reels, stories)
-
-Cross-cutting specialists (delegate non-platform-specific tasks):
-- workflow-agent: Convert natural language instructions into YAML workflows
-- trend-scout: Discover trending topics across platforms
-- analytics-reporter: Generate performance reports
-- content-repurposer: Adapt content across multiple platforms
-- brand-persona-agent: Generate or refine brand voice
-- viral-teardown-agent: Analyze viral content for patterns
-
-Response format:
-Return a JSON object with:
-- "delegate": the agent name to route to
-- "prompt": the refined prompt for that agent
-- "reasoning": brief explanation of routing decision`;
-
-const AGENT_NAME = "nexus-orchestrator";
-
-const orchestratorAgent = new Agent({
-  name: AGENT_NAME,
-  instructions: ORCHESTRATOR_INSTRUCTIONS,
-  model: undefined as any, // Model injected at runtime via agent-delegate
-  tools: {},
+const delegateToPlatform = createTool({
+  id: "delegateToPlatform",
+  description:
+    "Delegate a task to a platform-specific main agent (youtube-main, tiktok-main, instagram-main, linkedin-main, x-main)",
+  inputSchema: z.object({
+    platform: z.enum(["youtube", "tiktok", "instagram", "linkedin", "x"]).describe("Target platform"),
+    prompt: z.string().describe("Task prompt for the platform agent"),
+  }),
+  execute: async (executionContext) => {
+    const { platform, prompt } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { platform: string; prompt: string }) => {
+        const agentName = PLATFORM_AGENTS[input.platform];
+        if (!agentName) {
+          return { error: `Unknown platform: ${input.platform}`, status: "error" as const };
+        }
+        return {
+          delegatedTo: agentName,
+          platform: input.platform,
+          prompt: input.prompt,
+          status: "pending-wiring" as const,
+        };
+      },
+      { agentName: "orchestrator", toolName: "delegateToPlatform" },
+    );
+    return wrappedFn({ platform, prompt });
+  },
 });
 
-export function createOrchestratorAgent() {
-  return orchestratorAgent;
-}
+const delegateToSpecialist = createTool({
+  id: "delegateToSpecialist",
+  description:
+    "Delegate a task to a shared Tier 3 specialist agent (trend-scout, seo-agent, hook-writer, etc.)",
+  inputSchema: z.object({
+    specialistName: z.string().describe("Name of the specialist agent"),
+    prompt: z.string().describe("Task prompt for the specialist"),
+  }),
+  execute: async (executionContext) => {
+    const { specialistName, prompt } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { specialistName: string; prompt: string }) => ({
+        delegatedTo: input.specialistName,
+        prompt: input.prompt,
+        status: "pending-wiring" as const,
+      }),
+      { agentName: "orchestrator", toolName: "delegateToSpecialist" },
+    );
+    return wrappedFn({ specialistName, prompt });
+  },
+});
 
-export async function generateOrchestrator(
+export const orchestratorAgent = new Agent({
+  name: "orchestrator",
+  instructions: `You are the Orchestrator — the top-level coordinator for all content creation tasks.
+
+Your responsibilities:
+1. Analyze the incoming task and identify the target platform(s)
+2. Delegate to the appropriate Platform Main Agent (Tier 2)
+3. For cross-platform or shared tasks, delegate to Tier 3 specialists directly
+4. Aggregate results and return a unified response
+
+Platform agents: youtube-main, tiktok-main, instagram-main, linkedin-main, x-main
+Specialists: trend-scout, seo-agent, hook-writer, title-generator, caption-writer, hashtag-optimizer, quality-scorer
+
+Always delegate — never generate platform-specific content directly.`,
+  model: { provider: "openai", name: "gpt-4o" } as unknown as import("ai").LanguageModelV1,
+  tools: { delegateToPlatform, delegateToSpecialist },
+});
+
+/**
+ * Execute the orchestrator with context preparation and delegation.
+ * Entry point for the full chain: Orchestrator → Platform Main → Sub-agent/Specialist.
+ */
+export async function executeOrchestrator(
   prompt: string,
-  rawContext: RawAgentContext,
-  opts?: { model?: string; maxTokens?: number },
-) {
-  const ctx = prepareContext(AGENT_NAME, rawContext);
-  const systemPrompt = buildSystemPrompt(
-    ORCHESTRATOR_INSTRUCTIONS,
-    ctx.brandVoice as string | undefined,
+  context: WorkflowContext,
+): Promise<unknown> {
+  const strippedContext = prepareContext(
+    {
+      organizationId: context.organizationId,
+      workflowName: context.workflowName,
+      runId: context.runId,
+      input: context.input,
+      variables: context.variables,
+      config: context.config,
+    },
+    "orchestrator",
   );
 
-  const result = await orchestratorAgent.generate(prompt, {
-    instructions: systemPrompt,
-    maxTokens: opts?.maxTokens,
-  });
-
-  return {
-    text: result.text,
-    usage: result.usage
-      ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          model: opts?.model ?? "default",
-        }
-      : undefined,
-    toolCalls: result.toolCalls?.map((tc) => ({
-      name: tc.toolName,
-      args: tc.args as Record<string, unknown>,
-      result: undefined,
-    })),
-  };
+  return executeAgentDelegate("orchestrator", prompt, context);
 }

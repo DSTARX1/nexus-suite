@@ -1,104 +1,115 @@
-import { createTool } from "@mastra/core";
-import { z } from "zod";
-import { execPocketCli } from "@/server/modules/cli-bridge/cli-bridge.service";
+// Diagnostic wrapper for Mastra tool handlers — adapted from pocket-agent pattern.
+// Wraps every tool handler with timing, logging, error capture, and safety hooks.
 
-const MAX_LOG_SIZE = 2048;
+import { validateNoCredentials, stripPII, enforceToolScope } from "./safety";
 
-function truncate(value: unknown): string {
-  const str = typeof value === "string" ? value : JSON.stringify(value);
-  return str.length > MAX_LOG_SIZE
-    ? str.slice(0, MAX_LOG_SIZE) + `…[${str.length - MAX_LOG_SIZE} truncated]`
-    : str;
+interface ToolHandlerOptions {
+  /** Agent name owning this tool — used for scope enforcement */
+  agentName: string;
+  /** Tool name — used for scope enforcement + logging */
+  toolName: string;
 }
 
-interface ToolMeta {
-  domain: string;
-  service: string;
-  action: string;
-  description: string;
-  inputSchema: z.ZodObject<Record<string, z.ZodTypeAny>>;
-}
-
-export interface WrappedToolResult {
-  success: boolean;
-  data: unknown;
+interface ToolDiagnostics {
+  agentName: string;
+  toolName: string;
   durationMs: number;
-  error?: { name: string; message: string; stack?: string };
+  inputSize: number;
+  outputSize: number;
+  error?: string;
+}
+
+type ToolHandler<TInput, TOutput> = (input: TInput) => Promise<TOutput>;
+
+// Diagnostic log — in production this would go to structured logging / OpenTelemetry.
+// For now, in-memory ring buffer (last 1000 entries) accessible for debugging.
+const DIAGNOSTICS_BUFFER_SIZE = 1000;
+const diagnosticsBuffer: ToolDiagnostics[] = [];
+
+function pushDiagnostic(entry: ToolDiagnostics): void {
+  if (diagnosticsBuffer.length >= DIAGNOSTICS_BUFFER_SIZE) {
+    diagnosticsBuffer.shift();
+  }
+  diagnosticsBuffer.push(entry);
+}
+
+/** Read-only access to recent diagnostics (for debugging / admin endpoints). */
+export function getRecentDiagnostics(limit = 50): readonly ToolDiagnostics[] {
+  return diagnosticsBuffer.slice(-limit);
 }
 
 /**
- * Wrap a CLI bridge call as a Mastra tool with timing, error capture, and size logging.
+ * Wraps a Mastra tool handler with:
+ * 1. Tool scope enforcement (agent allowed to call this tool?)
+ * 2. PII stripping on string inputs
+ * 3. Timing / input-output size capture
+ * 4. Credential leak detection on output
+ * 5. Error capture with diagnostics
  */
-export function wrapToolHandler(meta: ToolMeta) {
-  return createTool({
-    id: `pocket_${meta.domain}_${meta.service}_${meta.action}`,
-    description: meta.description,
-    inputSchema: meta.inputSchema,
-    execute: async ({ context }): Promise<WrappedToolResult> => {
-      const start = performance.now();
-      const inputArgs: Record<string, string> = {};
-      for (const [k, v] of Object.entries(context as Record<string, unknown>)) {
-        inputArgs[k] = String(v);
+export function wrapToolHandler<TInput, TOutput>(
+  handler: ToolHandler<TInput, TOutput>,
+  opts: ToolHandlerOptions,
+): ToolHandler<TInput, TOutput> {
+  return async (rawInput: TInput): Promise<TOutput> => {
+    const start = performance.now();
+    const { agentName, toolName } = opts;
+
+    // 1. Scope check
+    enforceToolScope(agentName, toolName);
+
+    // 2. PII strip on string inputs
+    let input = rawInput;
+    if (typeof rawInput === "string") {
+      input = stripPII(rawInput) as unknown as TInput;
+    } else if (rawInput && typeof rawInput === "object") {
+      // Shallow strip: only top-level string fields
+      const cleaned = { ...rawInput } as Record<string, unknown>;
+      for (const [k, v] of Object.entries(cleaned)) {
+        if (typeof v === "string") {
+          cleaned[k] = stripPII(v);
+        }
+      }
+      input = cleaned as TInput;
+    }
+
+    const inputSize = JSON.stringify(input).length;
+
+    try {
+      const output = await handler(input);
+
+      const outputStr = JSON.stringify(output);
+      const durationMs = Math.round(performance.now() - start);
+
+      // 4. Credential leak check on output
+      if (typeof output === "string") {
+        validateNoCredentials(output);
+      } else if (outputStr) {
+        validateNoCredentials(outputStr);
       }
 
-      console.log(
-        `[tool:${meta.domain}/${meta.service}/${meta.action}] input=${truncate(inputArgs)}`,
-      );
+      pushDiagnostic({
+        agentName,
+        toolName,
+        durationMs,
+        inputSize,
+        outputSize: outputStr.length,
+      });
 
-      try {
-        const result = await execPocketCli(
-          meta.domain,
-          meta.service,
-          meta.action,
-          inputArgs,
-        );
-        const durationMs = Math.round(performance.now() - start);
+      return output;
+    } catch (err) {
+      const durationMs = Math.round(performance.now() - start);
+      const errorMsg = err instanceof Error ? err.message : String(err);
 
-        console.log(
-          `[tool:${meta.domain}/${meta.service}/${meta.action}] ok duration=${durationMs}ms output=${truncate(result.data)}`,
-        );
+      pushDiagnostic({
+        agentName,
+        toolName,
+        durationMs,
+        inputSize,
+        outputSize: 0,
+        error: errorMsg,
+      });
 
-        return { success: true, data: result.data, durationMs };
-      } catch (err) {
-        const durationMs = Math.round(performance.now() - start);
-        const error =
-          err instanceof Error
-            ? { name: err.name, message: err.message, stack: err.stack }
-            : { name: "UnknownError", message: String(err) };
-
-        console.error(
-          `[tool:${meta.domain}/${meta.service}/${meta.action}] error duration=${durationMs}ms ${error.message}`,
-        );
-
-        return { success: false, data: null, durationMs, error };
-      }
-    },
-  });
+      throw err;
+    }
+  };
 }
-
-// ── Pre-built tool definitions ───────────────────────────────────
-// Add concrete tools here as the CLI surface expands
-
-export const socialPostTool = wrapToolHandler({
-  domain: "social",
-  service: "post",
-  action: "create",
-  description: "Create a social media post via pocket-agent-cli",
-  inputSchema: z.object({
-    platform: z.string().describe("Target platform (twitter, instagram, etc.)"),
-    content: z.string().describe("Post content text"),
-    mediaUrl: z.string().optional().describe("Optional media attachment URL"),
-  }),
-});
-
-export const socialAnalyticsTool = wrapToolHandler({
-  domain: "social",
-  service: "analytics",
-  action: "fetch",
-  description: "Fetch social media analytics via pocket-agent-cli",
-  inputSchema: z.object({
-    platform: z.string().describe("Target platform"),
-    metric: z.string().describe("Metric to fetch (engagement, reach, etc.)"),
-    period: z.string().optional().describe("Time period (7d, 30d, etc.)"),
-  }),
-});

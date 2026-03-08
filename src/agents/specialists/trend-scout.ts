@@ -1,68 +1,45 @@
+// Trend Scout — Tier 3 shared specialist
+// Monitors trending topics across platforms for content opportunities.
+
 import { Agent } from "@mastra/core/agent";
-import { prepareContext } from "../general/prepare-context";
-import { buildSystemPrompt } from "../general/prompts";
-import type { RawAgentContext } from "../general/types";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { wrapToolHandler } from "@/agents/general";
+import { modelConfig } from "@/agents/platforms/model-config";
 
-const INSTRUCTIONS = `You are the Trend Scout for Nexus Suite.
-
-Single task: Discover trending topics across platforms and niches.
-
-Capabilities:
-- Monitor trending topics on X/Twitter, Reddit, HackerNews via CLI tools
-- Use Tavily search for broader trend discovery
-- Identify emerging trends before they peak
-- Score trend relevance to the creator's niche
-
-Output format:
-Return JSON with:
-- "trends": array of { topic, platform, velocity, relevance_score }
-- "emerging": trends still growing (early stage)
-- "peaking": trends at peak (act now)
-- "declining": trends past peak (avoid)
-- "recommended_action": what content to create for each trend`;
-
-const AGENT_NAME = "trend-scout";
-
-const trendScoutAgent = new Agent({
-  name: AGENT_NAME,
-  instructions: INSTRUCTIONS,
-  model: undefined as any,
-  tools: {},
+const searchTrends = createTool({
+  id: "tavilySearch",
+  description: "Search for trending topics and viral content patterns",
+  inputSchema: z.object({
+    query: z.string().describe("Search query for trends"),
+    platform: z.string().optional().describe("Filter by platform (youtube, tiktok, etc.)"),
+  }),
+  execute: async (executionContext) => {
+    const { query, platform } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { query: string; platform?: string }) => ({
+        query: input.query,
+        platform: input.platform ?? "all",
+        trends: [] as string[],
+        status: "pending-integration" as const,
+      }),
+      { agentName: "trend-scout", toolName: "tavilySearch" },
+    );
+    return wrappedFn({ query, platform });
+  },
 });
 
-export function createAgent() {
-  return trendScoutAgent;
-}
+export const trendScoutAgent = new Agent({
+  name: "trend-scout",
+  instructions: `You are the Trend Scout specialist. Your role is to identify trending topics, viral patterns, and content opportunities across platforms.
 
-export async function generate(
-  prompt: string,
-  rawContext: RawAgentContext,
-  opts?: { model?: string; maxTokens?: number },
-) {
-  const ctx = prepareContext(AGENT_NAME, rawContext);
-  const systemPrompt = buildSystemPrompt(
-    INSTRUCTIONS,
-    ctx.brandVoice as string | undefined,
-  );
+You can search for:
+- Trending hashtags and topics
+- Viral content patterns and formats
+- Emerging niches and content gaps
+- Competitor content performance signals
 
-  const result = await trendScoutAgent.generate(prompt, {
-    instructions: systemPrompt,
-    maxTokens: opts?.maxTokens,
-  });
-
-  return {
-    text: result.text,
-    usage: result.usage
-      ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          model: opts?.model ?? "default",
-        }
-      : undefined,
-    toolCalls: result.toolCalls?.map((tc) => ({
-      name: tc.toolName,
-      args: tc.args as Record<string, unknown>,
-      result: undefined,
-    })),
-  };
-}
+Return concise, actionable trend insights. Focus on timeliness and relevance to the creator's niche.`,
+  model: modelConfig.tier25,
+  tools: { searchTrends },
+});

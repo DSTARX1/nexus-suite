@@ -1,73 +1,44 @@
+// LinkedIn Platform Main Agent — Tier 2
+
 import { Agent } from "@mastra/core/agent";
-import { prepareContext } from "../../general/prepare-context";
-import { buildSystemPrompt } from "../../general/prompts";
-import type { RawAgentContext } from "../../general/types";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { wrapToolHandler } from "@/agents/general";
+import { modelConfig } from "@/agents/platforms/model-config";
 
-const INSTRUCTIONS = `You are the LinkedIn Platform Agent for Nexus Suite.
-
-Your role:
-- Handle all LinkedIn content: posts, articles, newsletters, document carousels
-- Enforce LinkedIn rules: post max 3000 chars, article max 125000 chars, professional tone
-- Optimize for LinkedIn algorithm: dwell time, comments, reshares
-
-Specialists you can delegate to:
-- hook-writer: Opening hooks for LinkedIn posts (stop-the-scroll first line)
-- caption-writer: LinkedIn post copy with professional tone
-- article-writer: Long-form LinkedIn articles with SEO
-- thread-writer: Multi-slide document carousels
-- hashtag-optimizer: LinkedIn hashtag strategy (3-5 max recommended)
-- trend-scout: Professional trending topics
-- quality-scorer: Score content before publishing
-- brand-persona-agent: Professional brand voice alignment
-
-Response format:
-Return JSON with:
-- "delegate": specialist agent name (if delegating)
-- "content": generated content (if producing directly)
-- "platform_metadata": LinkedIn-specific metadata (article vs post, visibility, etc.)`;
-
-const AGENT_NAME = "linkedin-agent";
-
-const linkedinAgent = new Agent({
-  name: AGENT_NAME,
-  instructions: INSTRUCTIONS,
-  model: undefined as any,
-  tools: {},
+const delegateToSubAgent = createTool({
+  id: "delegateToSubAgent",
+  description:
+    "Delegate a task to a LinkedIn sub-agent by name (professional-tone-adapter, article-formatter)",
+  inputSchema: z.object({
+    subAgentName: z.string().describe("Name of the sub-agent to delegate to"),
+    prompt: z.string().describe("Task prompt for the sub-agent"),
+  }),
+  execute: async (executionContext) => {
+    const { subAgentName, prompt } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { subAgentName: string; prompt: string }) => ({
+        delegatedTo: input.subAgentName,
+        prompt: input.prompt,
+        status: "pending-wiring" as const,
+      }),
+      { agentName: "linkedin-main", toolName: "delegateToSubAgent" },
+    );
+    return wrappedFn({ subAgentName, prompt });
+  },
 });
 
-export function createLinkedinAgent() {
-  return linkedinAgent;
-}
+export const linkedinMainAgent = new Agent({
+  name: "linkedin-main",
+  instructions: `You are the LinkedIn Platform Main Agent. Your role is to handle all LinkedIn-related content tasks.
 
-export async function generateLinkedin(
-  prompt: string,
-  rawContext: RawAgentContext,
-  opts?: { model?: string; maxTokens?: number },
-) {
-  const ctx = prepareContext(AGENT_NAME, rawContext);
-  const systemPrompt = buildSystemPrompt(
-    INSTRUCTIONS,
-    ctx.brandVoice as string | undefined,
-  );
+You can delegate to these sub-agents:
+- professional-tone-adapter: Adapts content to LinkedIn's professional tone
+- article-formatter: Formats long-form articles for LinkedIn's publishing platform
 
-  const result = await linkedinAgent.generate(prompt, {
-    instructions: systemPrompt,
-    maxTokens: opts?.maxTokens,
-  });
+For specialist tasks (SEO, hooks, captions), delegate to shared Tier 3 specialists via the orchestrator.
 
-  return {
-    text: result.text,
-    usage: result.usage
-      ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          model: opts?.model ?? "default",
-        }
-      : undefined,
-    toolCalls: result.toolCalls?.map((tc) => ({
-      name: tc.toolName,
-      args: tc.args as Record<string, unknown>,
-      result: undefined,
-    })),
-  };
-}
+Prioritize thought leadership, professional engagement, and network growth. Content should be insightful, not salesy.`,
+  model: modelConfig.tier2,
+  tools: { delegateToSubAgent },
+});

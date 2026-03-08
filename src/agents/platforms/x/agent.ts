@@ -1,72 +1,49 @@
+// X (Twitter) Platform Main Agent — Tier 2
+// Receives tasks from Orchestrator, delegates to Tier 2.5 sub-agents or Tier 3 specialists.
+
 import { Agent } from "@mastra/core/agent";
-import { prepareContext } from "../../general/prepare-context";
-import { buildSystemPrompt } from "../../general/prompts";
-import type { RawAgentContext } from "../../general/types";
+import { createTool } from "@mastra/core/tools";
+import { z } from "zod";
+import { wrapToolHandler } from "@/agents/general";
+import { modelConfig } from "@/agents/platforms/model-config";
 
-const INSTRUCTIONS = `You are the X (Twitter) Platform Agent for Nexus Suite.
-
-Your role:
-- Handle all X content: tweets, threads, replies, quote tweets, polls
-- Enforce X rules: tweet max 280 chars (or 25000 for premium), thread chunking
-- Optimize for X algorithm: replies, retweets, bookmarks, impressions
-
-Specialists you can delegate to:
-- hook-writer: Opening tweet hooks (stop-the-scroll in 280 chars)
-- caption-writer: Tweet copy optimized for engagement
-- thread-writer: Multi-tweet threads with narrative arc
-- hashtag-optimizer: X hashtag strategy (1-2 max recommended)
-- trend-scout: X/Twitter trending topics and hashtags
-- engagement-responder: Reply strategies and community management
-- quality-scorer: Score content before publishing
-
-Response format:
-Return JSON with:
-- "delegate": specialist agent name (if delegating)
-- "content": generated content (if producing directly)
-- "platform_metadata": X-specific metadata (poll options, quote tweet ref, etc.)`;
-
-const AGENT_NAME = "x-agent";
-
-const xAgent = new Agent({
-  name: AGENT_NAME,
-  instructions: INSTRUCTIONS,
-  model: undefined as any,
-  tools: {},
+const delegateToSubAgent = createTool({
+  id: "delegateToSubAgent",
+  description:
+    "Delegate a task to an X platform sub-agent by name (news-scout, tone-translator, engagement-responder)",
+  inputSchema: z.object({
+    subAgentName: z.string().describe("Name of the sub-agent to delegate to"),
+    prompt: z.string().describe("Task prompt for the sub-agent"),
+  }),
+  execute: async (executionContext) => {
+    const { subAgentName, prompt } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: { subAgentName: string; prompt: string }) => {
+        // Actual delegation wired in Chunk 3 via executeAgentDelegate
+        return {
+          delegatedTo: input.subAgentName,
+          prompt: input.prompt,
+          status: "pending-wiring" as const,
+        };
+      },
+      { agentName: "x-main", toolName: "delegateToSubAgent" },
+    );
+    return wrappedFn({ subAgentName, prompt });
+  },
 });
 
-export function createXAgent() {
-  return xAgent;
-}
+export const xMainAgent = new Agent({
+  name: "x-main",
+  instructions: `You are the X (Twitter) Platform Main Agent. Your role is to handle all X/Twitter-related content tasks.
 
-export async function generateX(
-  prompt: string,
-  rawContext: RawAgentContext,
-  opts?: { model?: string; maxTokens?: number },
-) {
-  const ctx = prepareContext(AGENT_NAME, rawContext);
-  const systemPrompt = buildSystemPrompt(
-    INSTRUCTIONS,
-    ctx.brandVoice as string | undefined,
-  );
+You can delegate to these sub-agents:
+- news-scout: Finds trending news and topics relevant to the brand
+- tone-translator: Adapts content to X's conversational, concise tone
+- engagement-responder: Crafts replies, quote tweets, and engagement responses
 
-  const result = await xAgent.generate(prompt, {
-    instructions: systemPrompt,
-    maxTokens: opts?.maxTokens,
-  });
+For specialist tasks (SEO, hashtags, hooks), delegate to shared Tier 3 specialists via the orchestrator.
 
-  return {
-    text: result.text,
-    usage: result.usage
-      ? {
-          promptTokens: result.usage.promptTokens,
-          completionTokens: result.usage.completionTokens,
-          model: opts?.model ?? "default",
-        }
-      : undefined,
-    toolCalls: result.toolCalls?.map((tc) => ({
-      name: tc.toolName,
-      args: tc.args as Record<string, unknown>,
-      result: undefined,
-    })),
-  };
-}
+Always keep posts within X's character limits. Prioritize engagement and virality.`,
+  model: modelConfig.tier2,
+  tools: { delegateToSubAgent },
+});

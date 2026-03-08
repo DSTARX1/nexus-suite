@@ -1,8 +1,21 @@
-chunk: 2/4
-status: complete
-files:
-  - src/agents/orchestrator/agent.ts (new) — Nexus Orchestrator agent
-  - src/agents/orchestrator/workflow-agent.ts (new) — NL→YAML workflow agent
-  - src/agents/registry.ts (updated) — registers both agents
-  - CLAUDE.md (updated) — phase line
-typecheck: pass (no agent errors)
+Chunk 2 complete. Created 17 files across `src/agents/platforms/`:
+
+- **model-config.ts** — centralized LanguageModelV1 config (tier2=gpt-4o, tier25=gpt-4o-mini)
+- **x/agent.ts** — X Main Agent (Tier 2) with delegateToSubAgent tool
+- **x/subagents/** — news-scout, tone-translator, engagement-responder (3 sub-agents)
+- **youtube/agent.ts** — YouTube Main Agent with delegateToSubAgent tool
+- **youtube/subagents/** — community-post-formatter, shorts-optimizer (2 sub-agents)
+- **tiktok/agent.ts** — TikTok Main Agent with delegateToSubAgent tool
+- **tiktok/subagents/** — duet-stitch-logic, sound-selector (2 sub-agents)
+- **instagram/agent.ts** — Instagram Main Agent with delegateToSubAgent tool
+- **instagram/subagents/** — carousel-sequencer, story-formatter (2 sub-agents)
+- **linkedin/agent.ts** — LinkedIn Main Agent with delegateToSubAgent tool
+- **linkedin/subagents/** — professional-tone-adapter, article-formatter (2 sub-agents)
+- **5x subagents/index.ts** — barrel exports per platform
+
+All agents use wrapToolHandler for delegation tools. Sub-agents use gpt-4o-mini (cost-optimized).
+delegateToSubAgent tools return pending-wiring status — actual delegation wired in Chunk 3.
+
+Zero type errors in new files. 9 pre-existing errors unchanged.
+
+Phase 2 done. Resume: gh issue view 16, execute Chunk 3. Files: src/agents/platforms/*. Issues: none.

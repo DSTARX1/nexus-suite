@@ -1,0 +1,6 @@
+Plan issue created: **#16** — 4 chunks:
+
+1. **Agent infrastructure + wrapToolHandler** — shared tooling (`general/`)
+2. **Platform Main Agents + Tier 2.5 sub-agents** — all 5 platforms, 12 sub-agents
+3. **Delegation wiring + client plugin resolution** — implement `resolveAgent()`, registry, delegateToX tools
+4. **End-to-end chain verification** — Orchestrator → YouTube Main → Trend Scout

@@ -1,59 +1,82 @@
-import type { RawAgentContext, PreparedContext } from "./types";
+// Data minimization per Decision 3 — each agent receives ONLY the fields it needs.
+// Takes full workflow context + agent name → returns stripped context.
 
-/**
- * Allowed fields per agent — only these keys survive stripping.
- * Agents not listed here get only organizationId + userPrompt.
- */
-const AGENT_ALLOWED_FIELDS: Record<string, readonly string[]> = {
-  "nexus-orchestrator": ["organizationId", "userPrompt"],
-  "workflow-agent": ["organizationId", "userPrompt", "contentDraft"],
-  "youtube-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft", "analytics"],
-  "tiktok-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft"],
-  "instagram-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft", "mediaAssets"],
-  "linkedin-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft"],
-  "x-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft"],
-  "facebook-agent": ["organizationId", "userPrompt", "platformData", "brandVoice", "contentDraft", "mediaAssets"],
-  "seo-agent": ["organizationId", "userPrompt", "analytics"],
-  "hook-writer": ["organizationId", "userPrompt", "platformData"],
-  "title-generator": ["organizationId", "userPrompt", "analytics"],
-  "thumbnail-creator": ["organizationId", "userPrompt", "mediaAssets"],
-  "script-agent": ["organizationId", "userPrompt", "brandVoice", "contentDraft"],
-  "caption-writer": ["organizationId", "userPrompt", "brandVoice", "platformData"],
-  "hashtag-optimizer": ["organizationId", "userPrompt", "analytics", "platformData"],
-  "thread-writer": ["organizationId", "userPrompt", "brandVoice", "contentDraft"],
-  "article-writer": ["organizationId", "userPrompt", "brandVoice", "analytics"],
-  "trend-scout": ["organizationId", "userPrompt", "platformData"],
-  "engagement-responder": ["organizationId", "userPrompt", "platformData"],
-  "analytics-reporter": ["organizationId", "userPrompt", "analytics"],
-  "content-repurposer": ["organizationId", "userPrompt", "contentDraft", "platformData", "mediaAssets"],
-  "quality-scorer": ["organizationId", "userPrompt", "contentDraft"],
-  "variation-orchestrator": ["organizationId", "userPrompt", "mediaAssets"],
-  "brand-persona-agent": ["organizationId", "userPrompt", "brandVoice"],
-  "viral-teardown-agent": ["organizationId", "userPrompt", "contentDraft", "analytics"],
+interface FullContext {
+  organizationId: string;
+  workflowName: string;
+  runId: string;
+  input: Record<string, unknown>;
+  variables: Record<string, unknown>;
+  config: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+type StrippedContext = Record<string, unknown>;
+
+// Per-agent whitelists — keys allowed from the full context.
+// Agents not listed here receive: organizationId + input + variables only.
+const AGENT_WHITELISTS: Record<string, readonly string[]> = {
+  // Tier 1
+  "orchestrator":        ["organizationId", "workflowName", "runId", "input", "variables", "config"],
+  "workflow-agent":      ["organizationId", "workflowName", "runId", "input", "variables", "config"],
+
+  // Tier 2 — platform mains get org + input + variables (no raw config)
+  "youtube-main":        ["organizationId", "input", "variables"],
+  "tiktok-main":         ["organizationId", "input", "variables"],
+  "instagram-main":      ["organizationId", "input", "variables"],
+  "linkedin-main":       ["organizationId", "input", "variables"],
+  "x-main":              ["organizationId", "input", "variables"],
+  "facebook-main":       ["organizationId", "input", "variables"],
+
+  // Tier 3 specialists — minimal: org + input only
+  "seo-agent":           ["organizationId", "input"],
+  "hook-writer":         ["organizationId", "input"],
+  "title-generator":     ["organizationId", "input"],
+  "thumbnail-creator":   ["organizationId", "input"],
+  "script-agent":        ["organizationId", "input"],
+  "caption-writer":      ["organizationId", "input"],
+  "hashtag-optimizer":   ["organizationId", "input"],
+  "thread-writer":       ["organizationId", "input"],
+  "article-writer":      ["organizationId", "input"],
+  "trend-scout":         ["organizationId", "input"],
+  "engagement-responder": ["organizationId", "input"],
+  "analytics-reporter":  ["organizationId", "input"],
+  "content-repurposer":  ["organizationId", "input"],
+  "quality-scorer":      ["organizationId", "input"],
+  "variation-orchestrator": ["organizationId", "input"],
+  "brand-persona":       ["organizationId", "input"],
+  "viral-teardown":      ["organizationId", "input"],
+
+  // Tier 2.5 sub-agents — same as specialists
+  "news-scout":          ["organizationId", "input"],
+  "tone-translator":     ["organizationId", "input"],
+  "x-engagement-responder": ["organizationId", "input"],
+  "community-post-formatter": ["organizationId", "input"],
+  "shorts-optimizer":    ["organizationId", "input"],
+  "duet-stitch-logic":   ["organizationId", "input"],
+  "sound-selector":      ["organizationId", "input"],
+  "carousel-sequencer":  ["organizationId", "input"],
+  "story-formatter":     ["organizationId", "input"],
+  "professional-tone-adapter": ["organizationId", "input"],
+  "article-formatter":   ["organizationId", "input"],
 };
 
-const BASE_FIELDS: readonly string[] = ["organizationId", "userPrompt"];
+const DEFAULT_WHITELIST: readonly string[] = ["organizationId", "input", "variables"];
 
 /**
- * Strip raw context to only fields the named agent needs.
- * Enforces data minimization: agents never see data they don't require.
+ * Strips workflow context down to only the fields the target agent needs.
+ * Prevents agents from accessing config, secrets references, or
+ * workflow internals beyond their scope.
  */
-export function prepareContext(
-  agentName: string,
-  raw: RawAgentContext,
-): PreparedContext {
-  const allowed = AGENT_ALLOWED_FIELDS[agentName] ?? BASE_FIELDS;
+export function prepareContext(fullContext: FullContext, agentName: string): StrippedContext {
+  const whitelist = AGENT_WHITELISTS[agentName] ?? DEFAULT_WHITELIST;
+  const stripped: StrippedContext = {};
 
-  const prepared: PreparedContext = {
-    organizationId: raw.organizationId,
-    userPrompt: raw.userPrompt,
-  };
-
-  for (const field of allowed) {
-    if (field in raw && raw[field] !== undefined) {
-      prepared[field] = raw[field];
+  for (const key of whitelist) {
+    if (key in fullContext) {
+      stripped[key] = fullContext[key];
     }
   }
 
-  return prepared;
+  return stripped;
 }

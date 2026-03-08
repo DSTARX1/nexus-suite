@@ -1,10 +1,10 @@
-Chunk 1 done. Created 4 files:
+Chunk 1 complete. Created 4 files in `src/agents/general/`:
 
-- **`src/agents/general/types.ts`** — `AgentConfig`, `AgentToolSet`, `RawAgentContext`, `PreparedContext` types
-- **`src/agents/general/prepare-context.ts`** — `prepareContext()` strips raw input to only fields each named agent needs (data minimization)
-- **`src/agents/general/prompts.ts`** — `buildSystemPrompt()` merges org brand voice + agent instructions
-- **`src/agents/registry.ts`** — `bootstrapAgents()` scaffold, ready for Chunks 2-4 to wire `registerAgent()` calls
+- **`safety.ts`** — `validateNoCredentials()` (regex scan for leaked keys/tokens), `stripPII()` (email/phone/SSN/card masking), `enforceToolScope()` (per-agent tool whitelist)
+- **`tool-wrappers.ts`** — `wrapToolHandler()` wraps every Mastra tool with: scope enforcement → PII strip → timing → credential leak detection → diagnostics ring buffer
+- **`prepare-context.ts`** — `prepareContext()` strips workflow context per Decision 3 whitelists (Tier 1 gets full context, Tier 2 gets org+input+vars, Tier 3/2.5 get org+input only)
+- **`index.ts`** — barrel export
 
-TypeScript: 0 errors in new files (9 pre-existing errors in other modules).
+Zero type errors in new files. Also fixed `next-auth` version pin and added `tsconfig.json` (was missing).
 
-Phase 1 done. Resume: `gh issue view 17`, execute Chunk 2. Files: `src/agents/general/{types,prepare-context,prompts}.ts`, `src/agents/registry.ts`. Issues: none.
+Phase 1 done. Resume: `gh issue view 16`, execute Chunk 2. Files: `src/agents/general/*`. Issues: none.

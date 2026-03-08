@@ -1,8 +1,10 @@
-Chunk 4 complete. Summary:
+Chunk 4 complete. Here's what was built:
 
-**Created 24 files:**
-- 6 platform agents: `src/agents/platforms/{youtube,tiktok,instagram,linkedin,x,facebook}/agent.ts`
-- 17 specialist agents: `src/agents/specialists/{seo-agent,hook-writer,title-generator,thumbnail-creator,script-agent,caption-writer,hashtag-optimizer,thread-writer,article-writer,trend-scout,engagement-responder,analytics-reporter,content-repurposer,quality-scorer,variation-orchestrator,brand-persona-agent,viral-teardown-agent}.ts`
-- Updated `src/agents/registry.ts` — all 25 agents imported and registered
+**New files:**
+- `src/agents/orchestrator/agent.ts` — Tier 1 orchestrator with `delegateToPlatform` and `delegateToSpecialist` tools, both wrapped with `wrapToolHandler`. Includes `executeOrchestrator()` entry point that runs `prepareContext()` before delegation.
+- `src/agents/specialists/trend-scout.ts` — Tier 3 shared specialist with `tavilySearch` tool (scope-restricted in safety.ts), wrapped with `wrapToolHandler`.
+- `src/agents/__tests__/chain-verification.ts` — Verification script validating: registry wiring, context stripping at each tier boundary, PII/credential/scope safety hooks, full 3-hop delegation chain (orchestrator → youtube-main → trend-scout), and missing-agent error handling.
 
-**Typecheck:** 0 new errors (9 pre-existing, none in agent files). CLAUDE.md phase updated to `Chunk 4/4 complete`.
+**TypeScript:** 0 new errors (9 pre-existing, none in new files).
+
+**CLAUDE.md:** phase updated to `Chunk 4/4 COMPLETE`.
