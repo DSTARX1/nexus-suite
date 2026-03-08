@@ -140,6 +140,7 @@ services:
       dockerfile: Dockerfile.scraper
     restart: unless-stopped
     environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@db:5432/nexus
       REDIS_URL: redis://redis:6379/0
       INFISICAL_SITE_URL: http://infisical:8080
       INFISICAL_CLIENT_ID: ${INFISICAL_SCRAPER_CLIENT_ID}
@@ -156,6 +157,8 @@ services:
           memory: 8G
     shm_size: 4gb
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 
