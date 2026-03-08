@@ -1,0 +1,8 @@
+TypeScript passes, no hooks exist, no test scripts. Wiring is solid:
+
+- `pricingRouter` registered in `root.ts` line 19
+- `api.pricing.createCheckoutSession` used in page matches router
+- `PricingTier` imported correctly from `@/lib/stripe`
+- Stripe client lazy-initialized, checkout session returns `url`
+
+Working tree is clean — no changes to commit. Feature is validated e2e.

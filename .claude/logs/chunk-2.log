@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Chunk 2 complete. Created `src/app/pricing/page.tsx`:
 
 - Client component at `/pricing` with 3 tier cards (Pro / Multiplier / Enterprise)
@@ -5,3 +6,10 @@ Chunk 2 complete. Created `src/app/pricing/page.tsx`:
 - "Get Started" button calls `api.pricing.createCheckoutSession.useMutation()` → redirects to Stripe URL
 - Follows settings page patterns: `"use client"`, `api` from `@/lib/trpc-client`, matching Tailwind styles
 - Typecheck passes clean
+=======
+Chunk 2 complete. Zero TS errors. Summary:
+
+**`src/server/api/routers/settings.ts`** — added `createPortalSession` mutation using `publicProcedure` with inline auth check (bypasses `orgBlocked` guard). Resolves org via `orgMember.findFirst` from `userId`, fetches `stripeCustomerId`, creates Stripe billing portal session.
+
+**`src/app/reactivate/page.tsx`** — client component showing "Subscription Inactive" message + "Manage Billing" button. Calls mutation, redirects to Stripe portal URL on success. Error state + loading state handled.
+>>>>>>> feature-31

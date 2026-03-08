@@ -1,0 +1,1 @@
+Done. One fix applied: wrapped `useSearchParams()` inside a `Suspense` boundary in `src/app/login/page.tsx` — required by Next.js 15 for static prerendering. Build now passes cleanly.

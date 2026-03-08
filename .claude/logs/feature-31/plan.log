@@ -1,0 +1,3 @@
+Plan issue created: **#46** — 2 chunks.
+
+Key finding during planning: `authedProcedure` blocks `orgBlocked` users, so `createPortalSession` must use `publicProcedure` with inline auth check. This is called out in the issue.

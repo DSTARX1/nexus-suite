@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { createTRPCRouter, onboardedProcedure } from "../trpc";
+import { createTRPCRouter, onboardedProcedure, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
+import { stripe } from "@/lib/stripe";
 
 export const settingsRouter = createTRPCRouter({
   // Org details (name, slug, tier, limits)
@@ -100,4 +101,30 @@ export const settingsRouter = createTRPCRouter({
 
       return { success: true };
     }),
+
+  // Create Stripe billing portal session for blocked users to reactivate
+  createPortalSession: publicProcedure.mutation(async ({ ctx }) => {
+    if (!ctx.session?.user?.id) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: "You must be logged in" });
+    }
+
+    const membership = await ctx.db.orgMember.findFirst({
+      where: { userId: ctx.session.user.id },
+      select: { organization: { select: { stripeCustomerId: true } } },
+    });
+
+    if (!membership?.organization?.stripeCustomerId) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No billing account found. Contact support.",
+      });
+    }
+
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: membership.organization.stripeCustomerId,
+      return_url: `${process.env.NEXTAUTH_URL}/reactivate`,
+    });
+
+    return { url: portalSession.url };
+  }),
 });

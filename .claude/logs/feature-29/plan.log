@@ -1,0 +1,3 @@
+Plan issue created: **#44** — 2 chunks:
+1. Add `SessionProvider` to `providers.tsx`
+2. Create `src/app/login/page.tsx` (Google OAuth button, error display, auth redirect)

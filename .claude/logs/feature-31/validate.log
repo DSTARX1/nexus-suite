@@ -1,0 +1,7 @@
+All good — nothing to commit, working tree is clean. Summary:
+
+- **tsc**: passes (no errors)
+- **hooks**: none found
+- **tests**: no test script in package.json
+- **wiring**: `settingsRouter` registered in `root.ts`, `stripe` lib exists with lazy init, `trpc-client` exported correctly, `createPortalSession` mutation wired end-to-end
+- **pages**: `/suspended` (static) and `/reactivate` (tRPC mutation → Stripe portal) both look correct
