@@ -1,13 +1,14 @@
-Chunk 3 complete. Created `src/server/services/distribution-scheduler.ts` with:
-
-- **`scheduleDistribution(orgId, variationId, targetPlatforms)`** — main entry
-- Eligible account query: healthScore DESC, filters OPEN circuits
-- Daily caps enforced (TikTok 3, IG 2, Shorts 5; overridable via `brandConfig.dailyCaps`)
-- Staggered scheduling: 30-120min random intervals + +-15min jitter
-- 10% skip probability for organic behavior mimicry
-- Creates `PostRecord` (SCHEDULED) + pg-boss job on `post:task` queue with `startAfter`
-- pg-boss singleton with lazy init
-
-`tsc --noEmit` couldn't run — `next-auth@^5.0.0` has no matching version in npm. Code reviewed manually; types align with schema and circuit-breaker imports.
-
-CLAUDE.md updated to **Chunk 3/4**.
+chunk: 3/3
+status: complete
+files:
+  - src/server/workflows/agent-delegate.ts (modified)
+  - docker-compose.yml (modified)
+  - CLAUDE.md (updated phase line)
+changes:
+  - Extended registerAgent() to accept optional tools array (MastraTool[])
+  - Registry stores RegisteredAgent { generateFn, tools } instead of bare function
+  - resolveAgent returns RegisteredAgent, executeAgentDelegate destructures it
+  - Return value includes toolsMeta (id + description) for downstream visibility
+  - Added POCKET_CLI_PATH env var to nexus-worker service in docker-compose.yml
+  - Added TODO comment re: Phase 4 Dockerfile.worker Go binary install
+typecheck: skipped (npm install fails on next-auth@^5.0.0 — pre-existing dep issue)

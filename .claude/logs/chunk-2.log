@@ -1,12 +1,15 @@
-Chunk 2 done. Created `src/server/services/circuit-breaker.ts` with:
+Chunk 2 complete. Created 4 files:
 
-- **State machine**: CLOSED → 3 failures → OPEN → cooldown expires → HALF_OPEN → success→CLOSED / failure→OPEN
-- **`canPost(accountId)`** — checks circuit state + Redis cooldown TTL, auto-transitions OPEN→HALF_OPEN when cooldown expires
-- **`recordSuccess(accountId)`** — resets failures, sets CLOSED, recovers healthScore, clears backoff/cooldown keys
-- **`recordFailure(accountId)`** — increments failures, transitions states, decays healthScore, sets Redis cooldown with exponential backoff (5→15→45min)
-- **Auto-disable** — healthScore < 0.3 triggers admin alert via Redis pub/sub `admin:alerts`
-- Follows existing patterns: `ioredis` + `@/lib/db` imports, same structure as `llm-budget.ts`
+- **`src/agents/general/tool-wrappers.ts`** — `wrapToolHandler()` wraps CLI bridge calls as Mastra `createTool()` with execution timing, structured error capture, payload size logging (truncated at 2KB). Includes `socialPostTool` and `socialAnalyticsTool` examples.
 
-Typecheck: only pre-existing missing `node_modules` errors (identical to `llm-budget.ts`). No type errors in the new code.
+- **`src/agents/general/safety.ts`** — Content policy check (keyword blocklist for prompt injection patterns) + per-tool rate limiting via Redis sliding window (`safety:ratelimit:{orgId}:{toolName}`).
 
-CLAUDE.md phase line updated to `Chunk 2/4`.
+- **`src/agents/general/prompts.ts`** — Template functions: `dataMinimizationPrompt()`, `brandVoicePrompt()`, `toolUsagePrompt()`, `composeSystemPrompt()`. All accept org context, return formatted strings.
+
+- **`src/agents/general/memory.ts`** — `prepareContext()` strips workflow context to agent-specific field allowlists (data minimization). `trimContextWindow()` and `summarizeForContext()` for context window management.
+
+**tsc**: skipped — no `tsconfig.json` in worktree, `npm install` fails on pre-existing `next-auth@^5.0.0` version mismatch.
+
+**CLAUDE.md** updated to Chunk 2/3.
+
+Phase 2 done. Resume: `gh issue view 15`, execute Chunk 3. Files: `src/agents/general/{tool-wrappers,safety,prompts,memory}.ts`. Issues: none.

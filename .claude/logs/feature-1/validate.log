@@ -1,0 +1,14 @@
+12 issues found and fixed, commit staged. Summary of what was resolved:
+
+- **tsconfig.json** — created (was missing entirely)
+- **Prisma 7 compat** — removed `url` from datasource, added `prisma.config.ts` + `@prisma/adapter-pg`
+- **Schema enum** — `subscriptionStatus` pointed at wrong enum (`OnboardingStatus` → `SubscriptionStatus`)
+- **Stripe API version** — pinned to `2025-02-24.acacia`, lazy init to avoid build crash
+- **Infisical SDK** — fixed `updateSecret`/`createSecret` call signatures
+- **Mastra StepResult** — `result.outputAs` doesn't exist on `StepResult`, fixed to `(child as any).outputAs`
+- **executor.ts** — implicit `any` in deps callback typed
+- **Stripe webhook** — `SubscriptionStatus` type violations resolved
+- **Next.js root layout** — created `src/app/layout.tsx` (required by Next 15)
+- **tRPC providers** — created `src/app/providers.tsx` with proper context wrappers
+- **tRPC route handler** — created `/api/trpc/[trpc]/route.ts` (all client calls were 404ing)
+- **next-auth v5** — pinned to `5.0.0-beta.30` (stable v5 doesn't exist)

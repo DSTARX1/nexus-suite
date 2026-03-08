@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import type Stripe from "stripe";
+import { type SubscriptionStatus } from "@prisma/client";
 import { stripe, resolveTierFromPriceId, PRICING } from "@/lib/stripe";
 import { db } from "@/lib/db";
 
@@ -112,8 +113,8 @@ async function handleCheckoutCompleted(event: Stripe.Event) {
       stripeCustomerId: customerId,
       stripeSubscriptionId: subscriptionId,
       setupPaymentIntentId: session.payment_intent as string | null,
-      subscriptionStatus: "ACTIVE",
-      onboardingStatus: "PENDING_SETUP",
+      subscriptionStatus: "ACTIVE" as const,
+      onboardingStatus: "PENDING_SETUP" as const,
       pricingTier: tier,
       ...features,
       members: {
@@ -143,7 +144,7 @@ async function handleSubscriptionUpdated(event: Stripe.Event) {
   if (!org) return; // not our subscription
 
   // Map Stripe status → our status
-  const statusMap: Record<string, string> = {
+  const statusMap: Record<string, SubscriptionStatus> = {
     active: "ACTIVE",
     past_due: "PAST_DUE",
     unpaid: "UNPAID",
@@ -162,20 +163,22 @@ async function handleSubscriptionUpdated(event: Stripe.Event) {
     ? resolveTierFromPriceId(recurringItem.price.id)
     : null;
 
-  const updateData: Record<string, unknown> = {
-    subscriptionStatus: newStatus,
-  };
-
-  // Denormalize new tier's feature gates if tier changed
   if (newTier && newTier !== org.pricingTier) {
     const features = PRICING[newTier].features;
-    Object.assign(updateData, { pricingTier: newTier, ...features });
+    await db.organization.update({
+      where: { id: org.id },
+      data: {
+        subscriptionStatus: newStatus,
+        pricingTier: newTier,
+        ...features,
+      },
+    });
+  } else {
+    await db.organization.update({
+      where: { id: org.id },
+      data: { subscriptionStatus: newStatus },
+    });
   }
-
-  await db.organization.update({
-    where: { id: org.id },
-    data: updateData,
-  });
 }
 
 // ── customer.subscription.deleted ────────────────────────────────
@@ -185,8 +188,8 @@ async function handleSubscriptionDeleted(event: Stripe.Event) {
   await db.organization.updateMany({
     where: { stripeSubscriptionId: subscription.id },
     data: {
-      subscriptionStatus: "CANCELED" as const,
-      onboardingStatus: "SUSPENDED" as const,
+      subscriptionStatus: "CANCELED" as SubscriptionStatus,
+      onboardingStatus: "SUSPENDED",
     },
   });
 }
@@ -203,7 +206,7 @@ async function handlePaymentFailed(event: Stripe.Event) {
 
   await db.organization.updateMany({
     where: { stripeSubscriptionId: subscriptionId },
-    data: { subscriptionStatus: "PAST_DUE" as const },
+    data: { subscriptionStatus: "PAST_DUE" as SubscriptionStatus },
   });
 }
 

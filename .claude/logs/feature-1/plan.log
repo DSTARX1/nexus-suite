@@ -1,0 +1,5 @@
+Plan issue created: **#15** — 3 chunks:
+
+1. **CLI Bridge Service** — `execPocketCli()` subprocess wrapper with Infisical credential bridging + temp file cleanup
+2. **Mastra Tool Wrappers + Safety + Prompts + Memory** — `wrapToolHandler()` diagnostics, Redis rate limits, `prepareContext()` data minimization, shared prompt templates
+3. **Agent Registry Wiring + Dockerfile** — wire tools into `agent-delegate.ts` registry, add env vars to docker-compose

@@ -1,12 +1,8 @@
-**Chunk 1 done.** Added:
+Chunk 1 done. Created `src/server/modules/cli-bridge/cli-bridge.service.ts` with:
 
-- **PostStatus** enum (SCHEDULED, POSTING, SUCCESS, FAILED, SKIPPED)
-- **SourceVideo** model — `organizationId`, `url`, `platform`, `r2StorageKey`, `duration`, `metadata`
-- **VideoVariation** model — `sourceVideoId`, `variationIndex`, `transforms` (Json), `r2StorageKey`, `fileHash`, `pHash`, `audioFingerprint`, `caption`, `status`
-- **PostRecord** model — `accountId` → OrgPlatformToken, `variationId` → VideoVariation, `platform`, `scheduledAt`, `postedAt`, `status`, `externalPostId`, `caption`, `errorMessage`
-- Back-references on Organization (`sourceVideos`, `postRecords`) and OrgPlatformToken (`postRecords`)
-- **pg-boss** `^10.0.0` added to package.json
+- **`execPocketCli(domain, service, action, args)`** — spawns Go binary via `execFile` (no shell injection), parses `--output json`, 60s timeout, 10MB buffer
+- **`execPocketCliWithCredentials(...)`** — per-org credential bridging: fetches access/refresh tokens from Infisical, optionally fetches proxy URL, writes temp config to `os.tmpdir()` with `randomUUID` filename + `0o600` perms, executes CLI, finally block unlinks temp file + nulls all credential vars
 
-Note: `prisma validate` fails on a pre-existing Prisma 7 datasource URL config issue (needs `prisma.config.ts`), not related to Chunk 1 changes. `tsc` not installed locally.
+`tsc` unavailable (deps can't install due to `next-auth@^5.0.0` version mismatch) — `|| true` expected.
 
-Phase 1 done. Resume: `gh issue view 23`, execute Chunk 2. Files: `prisma/schema.prisma`, `package.json`. Issues: pre-existing Prisma 7 datasource config migration needed.
+CLAUDE.md updated: `build - Chunk 1/3 - #15`.

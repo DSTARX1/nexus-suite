@@ -1,12 +1,20 @@
 import type { WorkflowContext } from "./control-flow";
 import { trackLlmSpend } from "../services/llm-budget";
+import type { WrappedToolResult } from "@/agents/general/tool-wrappers";
 
-// Agent registry: maps agent name → generate function
+// Agent registry: maps agent name → generate function + optional tools
 // Populated at startup when Mastra agents are initialized
 type AgentGenerateFn = (
   prompt: string,
   opts?: { model?: string; maxTokens?: number },
 ) => Promise<AgentResult>;
+
+// Mastra tool shape (from createTool)
+interface MastraTool {
+  id: string;
+  description: string;
+  execute: (input: unknown) => Promise<WrappedToolResult>;
+}
 
 interface AgentResult {
   text: string;
@@ -20,12 +28,22 @@ interface AgentResult {
     args: Record<string, unknown>;
     result: unknown;
   }>;
+  toolsMeta?: Array<{ id: string; description: string }>;
 }
 
-const agentRegistry = new Map<string, AgentGenerateFn>();
+interface RegisteredAgent {
+  generateFn: AgentGenerateFn;
+  tools: MastraTool[];
+}
 
-export function registerAgent(name: string, generateFn: AgentGenerateFn) {
-  agentRegistry.set(name, generateFn);
+const agentRegistry = new Map<string, RegisteredAgent>();
+
+export function registerAgent(
+  name: string,
+  generateFn: AgentGenerateFn,
+  tools: MastraTool[] = [],
+) {
+  agentRegistry.set(name, { generateFn, tools });
 }
 
 // Client plugin resolution order:
@@ -33,7 +51,7 @@ export function registerAgent(name: string, generateFn: AgentGenerateFn) {
 // 2. src/agents/platforms/{platform}/subagents/{agentName}
 // 3. src/agents/specialists/{agentName}
 // 4. Global agent registry (registered at startup)
-function resolveAgent(agentName: string, _orgId: string): AgentGenerateFn | null {
+function resolveAgent(agentName: string, _orgId: string): RegisteredAgent | null {
   // TODO: Phase 3 will implement dynamic client plugin loading
   // For now, use the global registry
   return agentRegistry.get(agentName) ?? null;
@@ -46,15 +64,15 @@ export async function executeAgentDelegate(
   model?: string,
   maxTokens?: number,
 ): Promise<unknown> {
-  const agent = resolveAgent(agentName, context.organizationId);
+  const entry = resolveAgent(agentName, context.organizationId);
 
-  if (!agent) {
+  if (!entry) {
     throw new Error(
       `Agent "${agentName}" not found. Available: [${Array.from(agentRegistry.keys()).join(", ")}]`,
     );
   }
 
-  const result = await agent(prompt, { model, maxTokens });
+  const result = await entry.generateFn(prompt, { model, maxTokens });
 
   // Track LLM spend if usage data is available
   if (result.usage) {
@@ -66,8 +84,15 @@ export async function executeAgentDelegate(
     );
   }
 
+  // Attach tool metadata so callers know which tools were available
+  const toolsMeta = entry.tools.map((t) => ({
+    id: t.id,
+    description: t.description,
+  }));
+
   return {
     text: result.text,
     toolCalls: result.toolCalls,
+    toolsMeta,
   };
 }
