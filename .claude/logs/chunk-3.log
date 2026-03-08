@@ -1,7 +1,8 @@
-Chunk 3 done. Changes:
+Chunk 3 done. Typecheck passes clean.
 
-- **`data-table.tsx`** — added `rowClassName` prop for conditional row styling
-- **`competitors/page.tsx`** — replaced `PostList` div list with `DataTable`. Columns: outlier indicator, title, views, likes, comments, date, actions. Row highlight for outliers via `rowClassName`
-- **`admin/page.tsx`** — replaced raw `<table>` with `DataTable<Org>`. All 8 columns migrated with custom cell renderers for name+slug combo, owner combo, status badges, action buttons
+**What was built** in `competitor-worker.ts`:
+- `reproducePost()` — fetches analysis from DB, chains script-agent → caption-writer → variation-orchestrator → `sendMediaJob()` → marks `reproduced = true`
+- Replaced reproduce stub in worker switch with `reproducePost()` call
+- Added imports for all 3 agents + `sendMediaJob`
 
-Type check passes clean.
+**Pipeline flow:** analyze must run first (guards with error), then reproduce fetches stored analysis JSON, feeds it through 3 agents sequentially, parses FFmpeg transforms, queues `media:task`, marks post reproduced.

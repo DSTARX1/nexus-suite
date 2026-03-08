@@ -1,9 +1,13 @@
-Chunk 2/2 done. Summary:
+Chunk 2 done. `tsc --noEmit` passes clean.
 
-- **competitors/page.tsx** — Replaced inline modal div with `<Modal>` component
-- **settings/page.tsx** — Replaced Name/Slug label+input blocks with `<FormField>`
-- **onboarding/page.tsx** — Replaced all 7 label+input+error blocks with `<FormField>` (Content Niche, Brand Voice, Tone Preferences, Competitor URLs, Posting Frequency, Content Style, Additional Notes)
-- Typecheck passes clean
-- CLAUDE.md updated, GitHub issue #56 fully checked off
+**What was built in `competitor-worker.ts`:**
+- Imports: `db`, `viralTeardown` agent, `Prisma` types, `randomUUID`
+- `ScrapeResult` type matching the scraper consumer's output shape
+- `scrape:task` / `scrape:result` queue constants
+- Correlation map (`pendingScrapes`) + `startScrapeResultListener()` — listens on `scrape:result`, resolves pending promises by `taskId`
+- `waitForScrapeResult(taskId)` — promise with 120s timeout
+- `analyzePost()` pipeline: dispatch `scrape:task` → await correlated `scrape:result` → call `viral-teardown-agent.generate()` → parse JSON → persist to `TrackedPost.analysis` + `analyzedAt`
+- `analyze` case in worker switch now calls `analyzePost()`
+- `reproduce` stub preserved for Chunk 3
 
-Phase 2/2 done. Resume: `gh issue view 56`, all chunks complete. Files: `competitors/page.tsx`, `settings/page.tsx`, `onboarding/page.tsx`, `CLAUDE.md`. Issues: none.
+Phase 2 done. Resume: `gh issue view 72`, execute Chunk 3. Files: `src/server/workers/competitor-worker.ts`, `CLAUDE.md`. Issues: none.

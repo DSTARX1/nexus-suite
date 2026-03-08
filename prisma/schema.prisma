@@ -333,6 +333,8 @@ model TrackedPost {
   isOutlier    Boolean  @default(false)
   outlierScore Float?
   reproduced   Boolean  @default(false)
+  analysis     Json?
+  analyzedAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
