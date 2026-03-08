@@ -1,0 +1,10 @@
+Chunk 2 done. Extended `services/ml-sidecar/main.py` with:
+
+- **`POST /predict/bandit`** — Thompson Sampling via Beta(alpha, beta) per arm, per-org state in Redis `bandit:{org_id}`
+- **`POST /feedback/bandit`** — updates alpha (success) or beta (failure) +1
+- **`POST /predict/adaptability`** — loads RandomForestClassifier from `/models/adaptability.pkl`, one-hot encodes platform/content_type, returns score + confidence
+- **`POST /retrain`** — queries DB for last 30 days `content_performance`, trains RF, saves model, returns accuracy
+
+Also added `scikit-learn` and `joblib` to `requirements.txt`. CLAUDE.md updated.
+
+Phase 2 done. Resume: `gh issue view 27`, execute Chunk 3. Files: `services/ml-sidecar/{main.py,requirements.txt}`. Issues: none.

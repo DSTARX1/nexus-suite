@@ -4,3 +4,5 @@ redis==5.2.1
 psycopg2-binary==2.9.10
 sentence-transformers==3.4.1
 numpy==2.2.2
+scikit-learn==1.6.1
+joblib==1.4.2
