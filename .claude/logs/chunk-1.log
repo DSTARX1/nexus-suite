@@ -1,0 +1,16 @@
+Chunk 1 complete. Summary of what was built:
+
+**Files created:**
+- `services/media-engine/package.json` — deps: pg-boss, @aws-sdk/client-s3
+- `services/media-engine/tsconfig.json` — ES2022/Node16 target
+- `Dockerfile.media` — node:22-slim + ffmpeg + yt-dlp via pipx
+- `services/media-engine/src/index.ts` — entry point w/ graceful shutdown
+- `services/media-engine/src/queue.ts` — pg-boss consumer on `media:task`, dispatches download/transform jobs (handlers are placeholder stubs for Chunk 2)
+- `services/media-engine/src/r2.ts` — S3-compatible R2 upload using env vars
+
+**Files modified:**
+- `docker-compose.yml` — added `DATABASE_URL` + `db` dependency to media-engine service
+
+**Typecheck:** `npx tsc --noEmit` passes clean.
+
+Phase 1 done. Resume: `gh issue view 19`, execute Chunk 2. Files: `services/media-engine/src/{queue,r2,index}.ts`, `Dockerfile.media`. Issues: none.

@@ -192,6 +192,7 @@ services:
       dockerfile: Dockerfile.media
     restart: unless-stopped
     environment:
+      DATABASE_URL: postgres://nexus:${POSTGRES_PASSWORD:-nexus_dev}@db:5432/nexus
       REDIS_URL: redis://redis:6379/0
       INFISICAL_SITE_URL: http://infisical:8080
       INFISICAL_CLIENT_ID: ${INFISICAL_MEDIA_CLIENT_ID}
@@ -210,6 +211,8 @@ services:
           cpus: "4"
           memory: 8G
     depends_on:
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
 

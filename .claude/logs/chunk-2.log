@@ -1,0 +1,14 @@
+Chunk 2 complete. Typecheck passes clean. Summary of what was built:
+
+**`download.ts`** — yt-dlp wrapper: `execFile('yt-dlp', ...)`, accepts URL + optional proxy (defaults to `PROXY_DATACENTER_ENDPOINT`), downloads to `/tmp`, returns local path/filename/size.
+
+**`transforms.ts`** — 4-layer transform definitions:
+- Layer 1 (file hash): strip metadata, `+bitexact`, randomize timestamps
+- Layer 2 (visual pHash): hflip, crop 2-5%, speed 0.95-1.05x, hue/colorbalance shift, padding, noise overlay, DAR micro-adjust
+- Layer 3 (audio fingerprint): pitch shift via asetrate+aresample, atempo 0.97-1.03x, white noise -60 to -50dB, bitrate variation
+- Layer 4 (structural): CRF 18-23, preset medium/slow, GOP 24-60, pix_fmt
+- `composeTransforms()` merges all layers into one `TransformFragment`
+
+**`ffmpeg.ts`** — Pipeline builder: constructs filter chains from `TransformFragment`, handles complex filtergraph for audio noise mix (amix), exposes `runPipeline()` (auto-compose) and `runRaw()` (agent-specified fragments).
+
+**`queue.ts`** — Wired both handlers: download dispatches to `download()` → `uploadToR2()`, transform dispatches to `runPipeline()`/`runRaw()` → `uploadToR2()`.

@@ -1,0 +1,8 @@
+chunk 3/3 — audio safety + combination engine + verification
+
+files created:
+- services/media-engine/src/audio-safety.ts — ebur128 loudness + silence detection, music vs speech heuristic, strip-and-replace audio
+- services/media-engine/src/combinator.ts — visual/audio/structural transform pool, unique combo generation per variation, collision-safe key dedup
+- services/media-engine/src/verify.ts — DCT-based video pHash, chromaprint audio fingerprint (fpcalc fallback to FFmpeg hash), Hamming distance, collision detection + index extraction
+
+typecheck: clean (npx tsc --noEmit)

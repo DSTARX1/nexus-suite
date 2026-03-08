@@ -1,0 +1,10 @@
+Done. One breaking issue found and fixed:
+
+**Dockerfile.media** — `npm ci --omit=dev` excluded `typescript` from install, so `npx tsc` would crash at Docker image build time. Fixed with a proper multi-stage build: `build` stage installs all deps and compiles, `runtime` stage copies the compiled `dist/` and installs only prod deps.
+
+All else was clean:
+- `tsc --noEmit` passes with zero errors
+- No pre-commit hooks (only `.sample` hooks in `.git/hooks/`)
+- No test scripts in `media-engine/package.json`
+- All imports resolve correctly across all 7 source files
+- `audio-safety.ts` and `combinator.ts` are standalone utility modules (not wired into the queue by design — used at the agent/orchestration layer)

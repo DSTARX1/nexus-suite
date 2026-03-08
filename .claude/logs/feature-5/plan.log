@@ -1,0 +1,8 @@
+Plan issue created: **#19** — [Plan: Phase 4B: Media Engine service (#5)](https://github.com/R3LAMP4GO/nexus-suite/issues/19)
+
+**3 chunks:**
+1. **Service scaffold** — Dockerfile.media, package.json, pg-boss `media:task` consumer, R2 upload client
+2. **yt-dlp + FFmpeg pipeline** — download wrapper, 4-layer hash alteration (file/visual/audio/structural)
+3. **Audio safety + combinator + verification** — music detection, unique combo generation, pHash/chromaprint distance > 5, collision regeneration
+
+CLAUDE.md updated to `plan - Chunk 0/3 - #19`.
