@@ -1,8 +1,20 @@
-chunk 3/3 — audio safety + combination engine + verification
+chunk-3: Bypass decision chain (Turnstile, reCAPTCHA, Camoufox, Scrapling)
+status: complete
+tsc: pass (0 errors)
 
 files created:
-- services/media-engine/src/audio-safety.ts — ebur128 loudness + silence detection, music vs speech heuristic, strip-and-replace audio
-- services/media-engine/src/combinator.ts — visual/audio/structural transform pool, unique combo generation per variation, collision-safe key dedup
-- services/media-engine/src/verify.ts — DCT-based video pHash, chromaprint audio fingerprint (fpcalc fallback to FFmpeg hash), Hamming distance, collision detection + index extraction
+  - services/scraper-pool/src/bypass/cookie-cache.ts — CF cookie Redis cache (30min TTL)
+  - services/scraper-pool/src/bypass/plain-http.ts — plain fetch + CF/reCAPTCHA/Turnstile detection
+  - services/scraper-pool/src/bypass/turnstile.ts — native Turnstile solver (iframe click + token poll)
+  - services/scraper-pool/src/bypass/recaptcha.ts — audio-first + vision LLM fallback
+  - services/scraper-pool/src/bypass/camoufox.ts — Firefox via Patchright (different fingerprint family)
+  - services/scraper-pool/src/bypass/scrapling-client.ts — HTTP POST to scrapling-sidecar
+  - services/scraper-pool/src/bypass/chain.ts — orchestrator: plain-http → patchright-stealth → camoufox → scrapling
 
-typecheck: clean (npx tsc --noEmit)
+decision chain order:
+  1. plain HTTP (with cached CF cookies if available)
+  2. patchright stealth (auto-routes to turnstile/recaptcha solver by challenge type)
+  3. camoufox (firefox fallback)
+  4. scrapling sidecar (last resort)
+
+cookie caching: on successful challenge solve, cookies cached in Redis scraper:cf:{domain} with 30min TTL for request mirroring

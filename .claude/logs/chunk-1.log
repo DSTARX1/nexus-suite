@@ -1,16 +1,19 @@
-Chunk 1 complete. Summary of what was built:
+Chunk 1 done. Here's what was built:
 
 **Files created:**
-- `services/media-engine/package.json` — deps: pg-boss, @aws-sdk/client-s3
-- `services/media-engine/tsconfig.json` — ES2022/Node16 target
-- `Dockerfile.media` — node:22-slim + ffmpeg + yt-dlp via pipx
-- `services/media-engine/src/index.ts` — entry point w/ graceful shutdown
-- `services/media-engine/src/queue.ts` — pg-boss consumer on `media:task`, dispatches download/transform jobs (handlers are placeholder stubs for Chunk 2)
-- `services/media-engine/src/r2.ts` — S3-compatible R2 upload using env vars
+- `services/scraper-pool/package.json` — standalone service w/ patchright, ioredis, pg-boss deps
+- `services/scraper-pool/tsconfig.json` — ES2022/Node16 module config
+- `services/scraper-pool/src/fingerprint.ts` — copied from `src/lib/fingerprint.ts`
+- `services/scraper-pool/src/pool.ts` — `AgentPool` class: async semaphore, N pre-warmed Patchright contexts, fingerprint injection on creation, `acquire()`/`release()`/`recycle()`/`shutdown()` lifecycle
+- `services/scraper-pool/src/index.ts` — entrypoint w/ graceful shutdown
 
-**Files modified:**
-- `docker-compose.yml` — added `DATABASE_URL` + `db` dependency to media-engine service
+**AgentPool key behaviors:**
+- Launches headless Chromium via Patchright with anti-detection flags
+- Creates `POOL_SIZE` (default 8) contexts with unique fingerprints (UA, viewport, timezone, WebGL, platform, languages)
+- Async semaphore: `acquire()` returns immediately if context available, otherwise queues caller
+- `recycle()` closes old context, creates fresh one with new fingerprint (used by Chunk 2's rotation)
+- Tracks `taskCount` per context for fingerprint rotation threshold
 
-**Typecheck:** `npx tsc --noEmit` passes clean.
+**Typecheck:** `tsc --noEmit` passes clean.
 
-Phase 1 done. Resume: `gh issue view 19`, execute Chunk 2. Files: `services/media-engine/src/{queue,r2,index}.ts`, `Dockerfile.media`. Issues: none.
+Phase 1 done. Resume: `gh issue view 18`, execute Chunk 2. Files: `services/scraper-pool/src/`. Issues: none.

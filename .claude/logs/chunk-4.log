@@ -1,0 +1,13 @@
+Chunk 4/4 complete. Summary of changes:
+
+**New files:**
+- `services/scraper-pool/src/consumer.ts` — pg-boss consumer subscribing to `scrape:task` queue, runs bypass chain, publishes `scrape:result` with `{taskId, html, cookies, meta}`
+- `services/scraper-pool/src/stream.ts` — Redis pub/sub progress streaming (`started`, `strategy:{name}`, `captcha:solving`, `success`, `failed`) on `scrape:stream:{taskId}` channels
+- `Dockerfile.scraper` — multi-stage build: Node 22 + tsc build → slim prod image with Patchright Chromium deps installed
+
+**Modified files:**
+- `services/scraper-pool/src/index.ts` — wired `ScrapeConsumer` into entrypoint with graceful shutdown
+- `docker-compose.yml` — added `DATABASE_URL` env + `db` health dependency for scraper-pool (pg-boss needs Postgres)
+- `CLAUDE.md` — phase updated to `build - Chunk 4/4 complete`
+
+Typecheck passes clean (`npx tsc --noEmit` — 0 errors).
