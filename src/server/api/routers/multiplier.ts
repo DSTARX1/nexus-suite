@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createTRPCRouter, onboardedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { Platform, Prisma } from "@prisma/client";
-import { composeTransforms } from "../../../../services/media-engine/src/transforms.js";
+import { composeTransforms } from "../../../../services/media-engine/src/transforms";
 import { sendMediaJob } from "@/server/services/media-queue";
 
 async function assertMultiplierEnabled(ctx: { db: any; organizationId: string }) {

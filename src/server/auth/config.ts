@@ -1,21 +1,13 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
+import { authConfig } from "./auth.config";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(db),
-  providers: [
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-  ],
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
   callbacks: {
+    ...authConfig.callbacks,
     // Layer 2: Session callback — inject org status into session
     // Blocks login entirely if subscription is CANCELED/INACTIVE
     async session({ session, user }) {
