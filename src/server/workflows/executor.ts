@@ -25,6 +25,7 @@ export interface WorkflowRunResult {
   workflowName: string;
   organizationId: string;
   status: "completed" | "failed" | "aborted";
+  reproduction?: boolean;
   steps: StepResult[];
   variables: Record<string, unknown>;
   startedAt: Date;
@@ -148,11 +149,17 @@ export async function executeWorkflow(
   const completedAt = new Date();
   const hasErrors = allResults.some((r) => r.status === "error");
 
+  // Detect reproduction workflows from input flags or workflow config
+  const isReproduction =
+    inputData?.reproduction === true ||
+    (workflow.config as Record<string, unknown> | undefined)?.reproduction === true;
+
   return {
     runId,
     workflowName: workflow.name,
     organizationId: workflow.organizationId,
     status: context.aborted ? "aborted" : hasErrors ? "failed" : "completed",
+    reproduction: isReproduction || undefined,
     steps: allResults,
     variables: context.variables,
     startedAt,

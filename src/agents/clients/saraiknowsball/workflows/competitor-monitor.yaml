@@ -1,0 +1,160 @@
+# Competitor Monitor — Content Reproduction Pipeline
+# Triggered when an outlier is detected (via competitor-polling-worker).
+# Flow: fetch post → viral-teardown → script-agent → caption-writer
+#       → quality-scorer (gate ≥ 7) → enqueue media → schedule post
+# Marks TrackedPost.reproduced = true on success.
+
+name: competitor-monitor
+description: "Reproduction pipeline: analyze outlier → generate script → write caption → quality gate → schedule"
+organizationId: "{{input.organizationId}}"
+trigger:
+  type: event
+  event: "outlier:detected"
+  filter:
+    autoReproduce: true
+config:
+  reproduction: true
+  qualityThreshold: 7
+input:
+  organizationId: "Organization ID"
+  postId: "Outlier TrackedPost ID"
+  url: "URL of the outlier content"
+  platform: "Source platform (TIKTOK, INSTAGRAM, YOUTUBE, X)"
+
+steps:
+  # ── Step 1: Viral teardown — analyze why this content is an outlier ──
+  - id: viral-teardown
+    type: agent-delegate
+    agent: viral-teardown-agent
+    prompt: >
+      Analyze this viral content and produce a Viral Recipe report.
+      URL: {{input.url}}
+      Platform: {{input.platform}}
+      Post ID: {{input.postId}}
+      
+      Identify: hook structure, pacing, emotional triggers, replicable elements.
+      Return JSON with viral_recipe, hook_analysis, replicable_elements, virality_score, and content_template.
+    outputAs: teardown
+    retries: 2
+    timeoutMs: 90000
+
+  # ── Step 2: Store analysis on the TrackedPost ──────────────────────
+  - id: mark-analyzed
+    type: action
+    action: reproduction.markAnalyzed
+    dependsOn:
+      - viral-teardown
+    params:
+      postId: "{{input.postId}}"
+      analysis: "{{teardown}}"
+    retries: 1
+    timeoutMs: 15000
+
+  # ── Step 3: Generate a reproduction script based on teardown ───────
+  - id: generate-script
+    type: agent-delegate
+    agent: script-agent
+    dependsOn:
+      - viral-teardown
+    prompt: >
+      Write a short-form video script for {{input.platform}} based on this viral teardown analysis:
+      {{teardown}}
+      
+      Replicate the successful elements but create ORIGINAL content.
+      Target 30-60 seconds. Include hook, body, and CTA.
+      Apply the content_template structure from the teardown.
+      Return JSON with script, duration_estimate, sections, word_count.
+    outputAs: script
+    retries: 2
+    timeoutMs: 90000
+
+  # ── Step 4: Write platform-optimized caption ───────────────────────
+  - id: write-caption
+    type: agent-delegate
+    agent: caption-writer
+    dependsOn:
+      - generate-script
+    prompt: >
+      Write a caption for this {{input.platform}} post.
+      Script: {{script}}
+      Viral teardown context: {{teardown}}
+      
+      Include relevant hashtags, a call-to-action, and optimize for the platform's character limits.
+      Return JSON with caption, char_count, platform, hashtags_included.
+    outputAs: caption
+    retries: 1
+    timeoutMs: 60000
+
+  # ── Step 5: Score quality (gate at ≥ 7) ────────────────────────────
+  - id: score-quality
+    type: agent-delegate
+    agent: quality-scorer
+    dependsOn:
+      - write-caption
+    prompt: >
+      Score this reproduced content 1-10 for {{input.platform}}.
+      Script: {{script}}
+      Caption: {{caption}}
+      Source teardown: {{teardown}}
+      
+      Evaluate: originality (must not be a copy), engagement potential, brand alignment, hook quality.
+      Return a JSON object with numeric 'score' field (1-10) and 'feedback' field.
+    outputAs: quality
+    retries: 1
+    timeoutMs: 30000
+
+  # ── Step 6: Quality gate — only proceed if score ≥ 7 ──────────────
+  - id: quality-gate
+    type: condition
+    condition: "{{quality.score}} >= 7"
+    dependsOn:
+      - score-quality
+    onTrue:
+      # Enqueue media processing job
+      - id: enqueue-media
+        type: action
+        action: reproduction.enqueueMedia
+        params:
+          organizationId: "{{input.organizationId}}"
+          sourceUrl: "{{input.url}}"
+        retries: 2
+        timeoutMs: 30000
+
+      # Schedule the reproduced post
+      - id: schedule-post
+        type: action
+        action: reproduction.schedule
+        dependsOn:
+          - enqueue-media
+        params:
+          organizationId: "{{input.organizationId}}"
+          platform: "{{input.platform}}"
+          caption: "{{caption.caption}}"
+          script: "{{script.script}}"
+          sourcePostId: "{{input.postId}}"
+          sourceUrl: "{{input.url}}"
+        retries: 2
+        timeoutMs: 30000
+
+      # Mark source post as reproduced
+      - id: mark-reproduced
+        type: action
+        action: reproduction.markReproduced
+        dependsOn:
+          - schedule-post
+        params:
+          postId: "{{input.postId}}"
+        retries: 1
+        timeoutMs: 15000
+
+    onFalse:
+      - id: log-low-quality
+        type: action
+        action: content.logSkipped
+        params:
+          organizationId: "{{input.organizationId}}"
+          reason: "Reproduction quality score {{quality.score}} below threshold (7)"
+          feedback: "{{quality.feedback}}"
+          sourcePostId: "{{input.postId}}"
+        retries: 1
+        timeoutMs: 15000

@@ -27,7 +27,7 @@ const TOOL_SCOPE: Record<string, Set<string>> = {
   "seo-agent":     new Set(["tavilySearch", "youtubeSearch", "getKeywordMetrics"]),
   "caption-writer": new Set(["getCharLimits", "getBrandVoice"]),
   "hashtag-optimizer": new Set(["getTrending", "getHashtagAnalytics"]),
-  "trend-scout":   new Set(["tavilySearch", "searchTwitter", "searchHackerNews", "searchReddit"]),
+  "trend-scout":   new Set(["tavilySearch", "searchTwitter", "searchHackerNews", "searchReddit", "getRssArticles", "getXUserProfile"]),
   "quality-scorer": new Set(["getEditingRules", "getQualityThresholds", "scoreContent"]),
   "article-writer":    new Set(["getArticleOutline"]),
   "script-agent":      new Set(["getScriptTemplate"]),

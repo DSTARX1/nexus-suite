@@ -16,7 +16,7 @@
 - Full architecture in `ARCHITECTURE.md` (Decisions 1-10, phases, verification)
 
 ## Current Phase
-**Phase:** [saraiknowsball #83-#93] — Chunks 1-5 done, starting Chunk 6/8
+**Phase:** [saraiknowsball #83-#93] — Chunks 1-6 done, starting Chunk 7/8
 
 ## Commands
 ```bash

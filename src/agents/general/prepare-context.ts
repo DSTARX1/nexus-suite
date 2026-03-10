@@ -48,6 +48,7 @@ const AGENT_WHITELISTS: Record<string, readonly string[]> = {
   "variation-orchestrator": ["organizationId", "input"],
   "brand-persona":       ["organizationId", "input"],
   "viral-teardown":      ["organizationId", "input"],
+  "viral-teardown-agent": ["organizationId", "input"],
 
   // Tier 2.5 sub-agents — same as specialists
   "news-scout":          ["organizationId", "input"],
