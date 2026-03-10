@@ -1,4 +1,4 @@
-// X API v2 read client — Bearer Token auth (App-Only).
+// X API v2 client — Bearer Token auth (reads) + OAuth 1.0a (writes).
 // Rate-limited to respect 10k reads/month free tier.
 // Results cached in Redis for 15 minutes.
 
@@ -258,4 +258,197 @@ export async function getUserMentions(
 
   await setCache(key, result);
   return result;
+}
+
+// ── OAuth 1.0a Signing (for write operations) ───────────────
+
+export interface XOAuthCredentials {
+  apiKey: string;
+  apiSecret: string;
+  accessToken: string;
+  accessTokenSecret: string;
+}
+
+function percentEncode(str: string): string {
+  return encodeURIComponent(str)
+    .replace(/!/g, "%21")
+    .replace(/\*/g, "%2A")
+    .replace(/'/g, "%27")
+    .replace(/\(/g, "%28")
+    .replace(/\)/g, "%29");
+}
+
+function buildOAuthHeader(
+  method: string,
+  url: string,
+  params: Record<string, string>,
+  creds: XOAuthCredentials,
+): string {
+  const oauthParams: Record<string, string> = {
+    oauth_consumer_key: creds.apiKey,
+    oauth_nonce: crypto.randomBytes(16).toString("hex"),
+    oauth_signature_method: "HMAC-SHA1",
+    oauth_timestamp: String(Math.floor(Date.now() / 1000)),
+    oauth_token: creds.accessToken,
+    oauth_version: "1.0",
+  };
+
+  const allParams = { ...oauthParams, ...params };
+  const paramString = Object.keys(allParams)
+    .sort()
+    .map((k) => `${percentEncode(k)}=${percentEncode(allParams[k]!)}`)
+    .join("&");
+
+  const baseString = `${method.toUpperCase()}&${percentEncode(url)}&${percentEncode(paramString)}`;
+  const signingKey = `${percentEncode(creds.apiSecret)}&${percentEncode(creds.accessTokenSecret)}`;
+  const signature = crypto
+    .createHmac("sha1", signingKey)
+    .update(baseString)
+    .digest("base64");
+
+  oauthParams["oauth_signature"] = signature;
+
+  const headerParts = Object.keys(oauthParams)
+    .sort()
+    .map((k) => `${percentEncode(k)}="${percentEncode(oauthParams[k]!)}"`)
+    .join(", ");
+
+  return `OAuth ${headerParts}`;
+}
+
+// ── Write Operations ────────────────────────────────────────
+
+export interface XPostTweetResponse {
+  data: { id: string; text: string };
+}
+
+const TWEETS_URL = "https://api.x.com/2/tweets";
+
+/**
+ * Post a single tweet via OAuth 1.0a User Context.
+ * Supports reply chaining via `replyToTweetId`.
+ */
+export async function postTweet(
+  text: string,
+  credentials: XOAuthCredentials,
+  replyToTweetId?: string,
+): Promise<XPostTweetResponse> {
+  const body: Record<string, unknown> = { text };
+  if (replyToTweetId) {
+    body.reply = { in_reply_to_tweet_id: replyToTweetId };
+  }
+
+  const auth = buildOAuthHeader("POST", TWEETS_URL, {}, credentials);
+
+  const res = await fetch(TWEETS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: auth,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (res.status === 429) {
+    const resetAt = res.headers.get("x-rate-limit-reset");
+    const retryAfter = resetAt
+      ? Math.max(0, parseInt(resetAt, 10) - Math.floor(Date.now() / 1000))
+      : 60;
+    throw new Error(`X API rate limited on tweet post. Retry after ${retryAfter}s`);
+  }
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`X API tweet post failed (${res.status}): ${errBody}`);
+  }
+
+  return (await res.json()) as XPostTweetResponse;
+}
+
+/**
+ * Post a thread of tweets, chaining each as a reply to the previous.
+ * Returns array of posted tweet IDs in order.
+ */
+export async function postThread(
+  tweets: string[],
+  credentials: XOAuthCredentials,
+): Promise<string[]> {
+  if (tweets.length === 0) throw new Error("Thread must have at least one tweet");
+
+  const postedIds: string[] = [];
+  let previousId: string | undefined;
+
+  for (const text of tweets) {
+    const result = await postTweet(text, credentials, previousId);
+    postedIds.push(result.data.id);
+    previousId = result.data.id;
+  }
+
+  return postedIds;
+}
+
+/**
+ * Split long-form content into thread-sized chunks at sentence boundaries.
+ * Respects the 280-char limit per tweet. Supports optional numbering mode.
+ */
+export function splitIntoThreadChunks(
+  content: string,
+  opts: { numbered?: boolean; maxChars?: number } = {},
+): string[] {
+  const maxChars = opts.maxChars ?? 280;
+
+  // Split content into sentences
+  const sentences = content
+    .split(/(?<=[.!?])\s+/)
+    .filter((s) => s.trim().length > 0);
+
+  const rawChunks: string[] = [];
+  let current = "";
+
+  for (const sentence of sentences) {
+    // If a single sentence exceeds limit, force-split it
+    if (sentence.length > maxChars) {
+      if (current.trim()) {
+        rawChunks.push(current.trim());
+        current = "";
+      }
+      // Word-level splitting for oversized sentences
+      const words = sentence.split(/\s+/);
+      let segment = "";
+      for (const word of words) {
+        const candidate = segment ? `${segment} ${word}` : word;
+        if (candidate.length > maxChars) {
+          if (segment.trim()) rawChunks.push(segment.trim());
+          segment = word;
+        } else {
+          segment = candidate;
+        }
+      }
+      if (segment.trim()) current = segment;
+      continue;
+    }
+
+    const candidate = current ? `${current} ${sentence}` : sentence;
+    if (candidate.length > maxChars) {
+      if (current.trim()) rawChunks.push(current.trim());
+      current = sentence;
+    } else {
+      current = candidate;
+    }
+  }
+
+  if (current.trim()) rawChunks.push(current.trim());
+
+  if (!opts.numbered) return rawChunks;
+
+  // Add numbering: "1/N) ..."
+  const total = rawChunks.length;
+  return rawChunks.map((chunk, i) => {
+    const prefix = `${i + 1}/${total}) `;
+    // If adding prefix would exceed limit, trim chunk
+    if (prefix.length + chunk.length > maxChars) {
+      return `${prefix}${chunk.slice(0, maxChars - prefix.length - 1)}…`;
+    }
+    return `${prefix}${chunk}`;
+  });
 }
