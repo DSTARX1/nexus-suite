@@ -19,7 +19,7 @@ Full plan in `@ARCHITECTURE.md` — all decisions (1-10), implementation phases,
 - Client plugins: `src/agents/clients/{org_id}/` — no direct Infisical access
 
 ## Current Phase
-**Phase:** [saraiknowsball #83-#93] - Chunk 1/8
+**Phase:** [saraiknowsball #83-#93] - Chunk 2/8
 
 ## Commands
 - `docker compose up -d` — start all 10 services

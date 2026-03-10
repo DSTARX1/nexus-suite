@@ -6,6 +6,73 @@ import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { wrapToolHandler } from "@/agents/general";
 import { modelConfig } from "@/agents/platforms/model-config";
+import { db } from "@/lib/db";
+
+const getRssArticles = createTool({
+  id: "getRssArticles",
+  description:
+    "Fetch recent RSS articles from monitored news feeds. Filter by organization and optional keyword search.",
+  inputSchema: z.object({
+    organizationId: z.string().describe("Organization ID to scope articles"),
+    keyword: z.string().optional().describe("Optional keyword to filter article titles/summaries"),
+    limit: z.number().min(1).max(50).default(20).describe("Max articles to return"),
+    hoursBack: z.number().min(1).max(168).default(24).describe("How many hours back to look"),
+  }),
+  execute: async (executionContext) => {
+    const { organizationId, keyword, limit, hoursBack } = executionContext.context;
+    const wrappedFn = wrapToolHandler(
+      async (input: {
+        organizationId: string;
+        keyword?: string;
+        limit: number;
+        hoursBack: number;
+      }) => {
+        const since = new Date(Date.now() - input.hoursBack * 60 * 60 * 1000);
+
+        const where: Record<string, unknown> = {
+          organizationId: input.organizationId,
+          fetchedAt: { gte: since },
+        };
+
+        if (input.keyword) {
+          where.OR = [
+            { title: { contains: input.keyword, mode: "insensitive" } },
+            { summary: { contains: input.keyword, mode: "insensitive" } },
+          ];
+        }
+
+        const articles = await db.rssArticle.findMany({
+          where,
+          take: input.limit,
+          orderBy: { publishedAt: "desc" },
+          select: {
+            title: true,
+            url: true,
+            summary: true,
+            author: true,
+            publishedAt: true,
+            feed: { select: { name: true } },
+          },
+        });
+
+        return {
+          articles: articles.map((a) => ({
+            title: a.title,
+            url: a.url,
+            summary: a.summary,
+            author: a.author,
+            publishedAt: a.publishedAt?.toISOString() ?? null,
+            feedName: a.feed.name,
+          })),
+          count: articles.length,
+          status: "ok" as const,
+        };
+      },
+      { agentName: "trend-scout", toolName: "getRssArticles" },
+    );
+    return wrappedFn({ organizationId, keyword, limit, hoursBack });
+  },
+});
 
 const searchTrends = createTool({
   id: "tavilySearch",
@@ -104,8 +171,9 @@ You can search for:
 - Viral content patterns and formats
 - Emerging niches and content gaps
 - Competitor content performance signals
+- Recent RSS news articles from monitored feeds
 
 Return concise, actionable trend insights. Focus on timeliness and relevance to the creator's niche.`,
   model: modelConfig.tier25,
-  tools: { searchTrends, searchTwitter, searchHackerNews, searchReddit },
+  tools: { getRssArticles, searchTrends, searchTwitter, searchHackerNews, searchReddit },
 });
