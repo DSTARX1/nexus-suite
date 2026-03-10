@@ -16,18 +16,16 @@
 - Full architecture in `ARCHITECTURE.md` (Decisions 1-10, phases, verification)
 
 ## Current Phase
-**Phase:** [saraiknowsball #83-#93] — Chunks 1-6 done, starting Chunk 7/8
+**Phase:** [saraiknowsball #83-#93] — Chunks 1-7 done, starting Chunk 8/8
 
 ## Commands
 ```bash
+# Infrastructure
 docker compose up -d            # start all 10 services
 docker compose up -d db redis   # start infra only
 npx prisma migrate dev          # run migrations
 npx prisma generate             # generate client
-```
 
-## Shell Commands
-```bash
 # Sequential pipeline (plan → build → validate → ship)
 speedrun              # all open 'auto' issues
 speedrun 214          # single issue

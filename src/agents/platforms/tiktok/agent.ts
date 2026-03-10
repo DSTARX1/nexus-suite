@@ -1,5 +1,5 @@
 // TikTok Platform Main Agent — Tier 2
-// Extended with comment fetching via scraper-pool.
+// Extended with comment fetching via scraper-pool and posting pipeline.
 
 import { Agent } from "@mastra/core/agent";
 import { createTool } from "@mastra/core/tools";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { wrapToolHandler } from "@/agents/general";
 import { executeAgentDelegate, getWorkflowContext } from "@/server/workflows/agent-delegate";
 import { modelConfig } from "@/agents/platforms/model-config";
+import { scheduleTikTokPost, getTikTokPostStatus } from "./tools/post";
 
 const SCRAPER_POOL_URL = process.env.SCRAPER_POOL_URL ?? "http://localhost:3100";
 
@@ -92,10 +93,13 @@ You can delegate to these sub-agents:
 - sound-selector: Selects trending sounds and music for maximum reach
 
 Use fetchTikTokComments to retrieve comments from TikTok videos for engagement analysis.
+Use scheduleTikTokPost to queue video content for posting through the rate-limited distribution pipeline.
+Use getTikTokPostStatus to check on a scheduled post's progress.
 
 For specialist tasks (hooks, captions, hashtags, trends), delegate to shared Tier 3 specialists via the orchestrator.
 
-Prioritize algorithmic reach, trending sounds, and native TikTok formats. Content must feel authentic, not polished.`,
+Prioritize algorithmic reach, trending sounds, and native TikTok formats. Content must feel authentic, not polished.
+Note: Unaudited TikTok apps post as SELF_ONLY. Audit required for PUBLIC_TO_EVERYONE.`,
   model: modelConfig.tier2,
-  tools: { delegateToSubAgent, fetchTikTokComments },
+  tools: { delegateToSubAgent, fetchTikTokComments, scheduleTikTokPost, getTikTokPostStatus },
 });

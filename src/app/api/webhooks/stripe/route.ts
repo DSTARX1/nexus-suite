@@ -48,6 +48,10 @@ export async function POST(req: Request) {
       case "invoice.payment_failed":
         await handlePaymentFailed(event);
         break;
+
+      case "invoice.paid":
+        await handleInvoicePaid(event);
+        break;
     }
 
     // Record processed event
@@ -208,6 +212,40 @@ async function handlePaymentFailed(event: Stripe.Event) {
     where: { stripeSubscriptionId: subscriptionId },
     data: { subscriptionStatus: "PAST_DUE" as SubscriptionStatus },
   });
+}
+
+// ── invoice.paid ─────────────────────────────────────────────────
+// Confirms successful payment — reactivates PAST_DUE orgs and logs payment
+async function handleInvoicePaid(event: Stripe.Event) {
+  const invoice = event.data.object as Stripe.Invoice;
+  const subscriptionId =
+    typeof invoice.subscription === "string"
+      ? invoice.subscription
+      : invoice.subscription?.id;
+
+  if (!subscriptionId) return;
+
+  const org = await db.organization.findUnique({
+    where: { stripeSubscriptionId: subscriptionId },
+  });
+
+  if (!org) return;
+
+  // If org was PAST_DUE, reactivate on successful payment
+  if (org.subscriptionStatus === "PAST_DUE") {
+    await db.organization.update({
+      where: { id: org.id },
+      data: { subscriptionStatus: "ACTIVE" },
+    });
+  }
+
+  // If org was SUSPENDED due to payment issues, reactivate
+  if (org.onboardingStatus === "SUSPENDED" && org.subscriptionStatus !== "CANCELED") {
+    await db.organization.update({
+      where: { id: org.id },
+      data: { onboardingStatus: "ACTIVE" },
+    });
+  }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────

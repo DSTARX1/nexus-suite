@@ -1,5 +1,5 @@
 // Instagram Platform Main Agent — Tier 2
-// Extended with Graph API comment fetch and reply tools.
+// Extended with Graph API comment fetch/reply tools and posting pipeline.
 
 import { Agent } from "@mastra/core/agent";
 import { createTool } from "@mastra/core/tools";
@@ -7,6 +7,7 @@ import { z } from "zod";
 import { wrapToolHandler } from "@/agents/general";
 import { executeAgentDelegate, getWorkflowContext } from "@/server/workflows/agent-delegate";
 import { modelConfig } from "@/agents/platforms/model-config";
+import { scheduleInstagramPost, getInstagramPostStatus } from "./tools/post";
 
 const GRAPH_API = "https://graph.facebook.com/v21.0";
 
@@ -136,10 +137,12 @@ You can delegate to these sub-agents:
 - story-formatter: Formats content for Instagram Stories (stickers, polls, CTAs)
 
 Use fetchIGComments to retrieve comments on posts and replyToIGComment to respond.
+Use scheduleInstagramPost to queue content for posting through the rate-limited distribution pipeline.
+Use getInstagramPostStatus to check on a scheduled post's progress.
 
 For specialist tasks (captions, hashtags, SEO), delegate to shared Tier 3 specialists via the orchestrator.
 
 Prioritize visual quality, engagement rate, and saves/shares. Optimize for the Explore page algorithm.`,
   model: modelConfig.tier2,
-  tools: { delegateToSubAgent, fetchIGComments, replyToIGComment },
+  tools: { delegateToSubAgent, fetchIGComments, replyToIGComment, scheduleInstagramPost, getInstagramPostStatus },
 });

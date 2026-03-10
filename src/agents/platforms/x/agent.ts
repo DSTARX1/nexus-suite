@@ -1,5 +1,6 @@
 // X (Twitter) Platform Main Agent — Tier 2
 // Receives tasks from Orchestrator, delegates to Tier 2.5 sub-agents or Tier 3 specialists.
+// Wired with posting tools that route through the distribution-scheduler pipeline.
 
 import { Agent } from "@mastra/core/agent";
 import { createTool } from "@mastra/core/tools";
@@ -7,6 +8,7 @@ import { z } from "zod";
 import { wrapToolHandler } from "@/agents/general";
 import { executeAgentDelegate, getWorkflowContext } from "@/server/workflows/agent-delegate";
 import { modelConfig } from "@/agents/platforms/model-config";
+import { scheduleXPost, postXThread } from "./tools/post";
 
 const delegateToSubAgent = createTool({
   id: "delegateToSubAgent",
@@ -43,9 +45,12 @@ You can delegate to these sub-agents:
 - tone-translator: Adapts content to X's conversational, concise tone
 - x-engagement-responder: Crafts replies, quote tweets, and engagement responses
 
+Use scheduleXPost to queue video content for posting through the rate-limited distribution pipeline.
+Use postXThread to publish long-form content as a thread of chained tweets.
+
 For specialist tasks (SEO, hashtags, hooks), delegate to shared Tier 3 specialists via the orchestrator.
 
 Always keep posts within X's character limits. Prioritize engagement and virality.`,
   model: modelConfig.tier2,
-  tools: { delegateToSubAgent },
+  tools: { delegateToSubAgent, scheduleXPost, postXThread },
 });
