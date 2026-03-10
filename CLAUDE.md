@@ -1,12 +1,8 @@
 # Nexus Suite
 
-## Architecture
-Full plan in `@ARCHITECTURE.md` — all decisions (1-10), implementation phases, verification criteria.
-
 ## Stack
 - Next.js 15 + tRPC + Prisma 7 + PostgreSQL (pgvector) + Redis 7
-- Mastra agents (multi-tier hierarchy)
-- Docker Compose (10 services)
+- Mastra agents (multi-tier hierarchy), Docker Compose (10 services)
 - Infisical (secrets), Cloudflare R2 (storage)
 - Patchright (stealth browser), FFmpeg (media processing)
 - pg-boss (job queues), BullMQ (specialized workers)
@@ -17,40 +13,32 @@ Full plan in `@ARCHITECTURE.md` — all decisions (1-10), implementation phases,
 - Secrets: DB stores Infisical Secret IDs only, fetch-use-discard pattern
 - Agent data minimization: `prepareContext()` strips input before agent calls
 - Client plugins: `src/agents/clients/{org_id}/` — no direct Infisical access
+- Full architecture in `ARCHITECTURE.md` (Decisions 1-10, phases, verification)
 
 ## Current Phase
-**Phase:** [saraiknowsball #83-#93] - Chunk 3/8
+**Phase:** [saraiknowsball #83-#93] — Chunks 1-4 done, starting Chunk 5/8
 
 ## Commands
-- `docker compose up -d` — start all 10 services
-- `docker compose up -d db redis` — start infra only
-- `npx prisma migrate dev` — run migrations
-- `npx prisma generate` — generate client
+```bash
+docker compose up -d            # start all 10 services
+docker compose up -d db redis   # start infra only
+npx prisma migrate dev          # run migrations
+npx prisma generate             # generate client
+```
 
 ## Shell Commands
-
-### `speedrun` — Sequential feature pipeline
-Runs issues one at a time through plan → build → validate → ship.
 ```bash
-speedrun              # all open issues with 'auto' label
+# Sequential pipeline (plan → build → validate → ship)
+speedrun              # all open 'auto' issues
 speedrun 214          # single issue
 speedrun 214-220      # range
 speedrun 214,216,220  # specific issues
-```
 
-### `speedrun-parallel` — Parallel feature pipeline
-Runs up to 3 issues simultaneously in isolated git worktrees.
-```bash
-speedrunp              # all open issues with 'auto' label
+# Parallel pipeline (up to 3 issues in isolated worktrees)
+speedrunp              # all open 'auto' issues
 speedrunp 214-220      # range
-```
 
-### `speedrun-pcheck` — Check parallel speedrun status
-```bash
-speedrun-pcheck
-```
-
-### `speedrun-ptail` — Tail a parallel issue log
-```bash
-speedrun-ptail 214
+# Monitoring
+speedrun-pcheck        # check parallel status
+speedrun-ptail 214     # tail a parallel issue log
 ```

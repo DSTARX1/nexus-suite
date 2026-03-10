@@ -14,6 +14,9 @@ const CRON_SCHEDULE = "*/15 * * * *"; // every 15 min
 const SCRAPLING_URL =
   process.env.SCRAPLING_URL ?? "http://scrapling-sidecar:8000";
 const SCRAPLING_TIMEOUT = 60_000;
+const SCRAPER_POOL_URL =
+  process.env.SCRAPER_POOL_URL ?? "http://scraper-pool:3100";
+const SCRAPER_POOL_TIMEOUT = 90_000; // hashtag pages load slower
 
 // ── Sidecar types ────────────────────────────────────────────
 
@@ -32,6 +35,29 @@ interface ScrapePostsResponse {
   count: number;
   tier_used: number;
 }
+
+// ── Hashtag scraper types ────────────────────────────────────
+
+interface ScrapedHashtagPost {
+  url: string | null;
+  description: string | null;
+  creator: string | null;
+  views: string | null;
+  likes: string | null;
+  comments: string | null;
+  sound: string | null;
+  thumbnail: string | null;
+}
+
+interface HashtagScrapeResponse {
+  posts: ScrapedHashtagPost[];
+  count: number;
+  hashtag: string;
+  platform: string;
+}
+
+// Default poll interval for hashtags (1 hour in seconds)
+const HASHTAG_POLL_INTERVAL = 3600;
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -355,9 +381,126 @@ async function pollCreatorViaXApi(
   }
 }
 
+// ── Poll single hashtag ──────────────────────────────────────
+
+async function pollHashtag(hashtag: {
+  id: string;
+  organizationId: string;
+  platform: string;
+  tag: string;
+}): Promise<void> {
+  const resp = await fetch(`${SCRAPER_POOL_URL}/scrape/hashtag`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      hashtag: hashtag.tag,
+      platform: hashtag.platform.toLowerCase(),
+      limit: 20,
+    }),
+    signal: AbortSignal.timeout(SCRAPER_POOL_TIMEOUT),
+  });
+
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    console.error(
+      `[competitor-poll] hashtag scrape failed for #${hashtag.tag}: ${resp.status} ${body}`,
+    );
+    return;
+  }
+
+  const data = (await resp.json()) as HashtagScrapeResponse;
+  let stored = 0;
+
+  for (let i = 0; i < data.posts.length; i++) {
+    const scraped = data.posts[i];
+
+    // Skip posts without a URL or creator
+    if (!scraped.url || !scraped.creator) continue;
+
+    // Extract video ID from URL for externalId
+    const videoIdMatch = scraped.url.match(/\/video\/(\d+)/);
+    const externalId = videoIdMatch ? videoIdMatch[1] : `hashtag-${hashtag.tag}-${i}`;
+
+    // Find or create the creator record for this org+platform+username
+    const creator = await db.trackedCreator.upsert({
+      where: {
+        organizationId_platform_username: {
+          organizationId: hashtag.organizationId,
+          platform: hashtag.platform as "TIKTOK",
+          username: scraped.creator,
+        },
+      },
+      create: {
+        organizationId: hashtag.organizationId,
+        platform: hashtag.platform as "TIKTOK",
+        username: scraped.creator,
+        profileUrl: `https://www.tiktok.com/@${scraped.creator}`,
+        isActive: false, // discovered via hashtag, not explicitly tracked
+        autoReproduce: false,
+      },
+      update: {},
+    });
+
+    const views = parseCount(scraped.views);
+    const likes = parseCount(scraped.likes);
+    const comments = parseCount(scraped.comments);
+
+    const post = await db.trackedPost.upsert({
+      where: {
+        creatorId_externalId: {
+          creatorId: creator.id,
+          externalId,
+        },
+      },
+      create: {
+        creatorId: creator.id,
+        externalId,
+        title: scraped.description?.slice(0, 200) ?? null,
+        url: scraped.url,
+        thumbnailUrl: scraped.thumbnail ?? null,
+        views,
+        likes,
+        comments,
+      },
+      update: {
+        title: scraped.description?.slice(0, 200) ?? undefined,
+        url: scraped.url,
+        thumbnailUrl: scraped.thumbnail ?? undefined,
+        views,
+        likes,
+        comments,
+      },
+    });
+
+    await db.postSnapshot.create({
+      data: {
+        postId: post.id,
+        views,
+        likes,
+        comments,
+      },
+    });
+
+    stored++;
+  }
+
+  await db.trackedHashtag.update({
+    where: { id: hashtag.id },
+    data: { lastPolledAt: new Date() },
+  });
+
+  console.log(
+    `[competitor-poll] polled hashtag=#${hashtag.tag} scraped=${data.count} stored=${stored}`,
+  );
+}
+
+// ── Cron handler ─────────────────────────────────────────────
+
 async function handlePollCron(): Promise<void> {
   const now = new Date();
   const b = await getBoss();
+
+  // ── Poll creators ──────────────────────────────────────────
 
   const dueCreators = await db.trackedCreator.findMany({
     where: {
@@ -404,6 +547,43 @@ async function handlePollCron(): Promise<void> {
       await pollCreator(b, creator);
     } catch (err) {
       console.error(`[competitor-poll] error polling creator=${creator.id}:`, err);
+    }
+  }
+
+  // ── Poll hashtags ──────────────────────────────────────────
+
+  const dueHashtags = await db.trackedHashtag.findMany({
+    where: {
+      isActive: true,
+      OR: [
+        { lastPolledAt: null },
+        {
+          lastPolledAt: {
+            lt: new Date(now.getTime() - HASHTAG_POLL_INTERVAL * 1000),
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+      organizationId: true,
+      platform: true,
+      tag: true,
+    },
+  });
+
+  console.log(
+    `[competitor-poll] ${dueHashtags.length} hashtags due`,
+  );
+
+  for (const hashtag of dueHashtags) {
+    try {
+      await pollHashtag(hashtag);
+    } catch (err) {
+      console.error(
+        `[competitor-poll] error polling hashtag=#${hashtag.tag}:`,
+        err,
+      );
     }
   }
 }
