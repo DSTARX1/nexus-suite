@@ -4,6 +4,6 @@ import { defineConfig } from "prisma/config";
 export default defineConfig({
   schema: path.join(__dirname, "schema.prisma"),
   datasource: {
-    url: process.env.DATABASE_URL ?? "postgresql://imorgado@localhost:5432/nexus",
+    url: process.env.DATABASE_URL ?? "postgresql://nexus:nexus_dev@localhost:5434/nexus",
   },
 });

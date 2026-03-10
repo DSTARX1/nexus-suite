@@ -12,7 +12,11 @@
     "db:studio": "prisma studio",
     "admin:provision": "tsx src/cli/index.ts provision",
     "admin:assign-proxy": "tsx src/cli/index.ts assign-proxy",
-    "admin:generate-workflows": "tsx src/cli/index.ts generate-workflows"
+    "admin:generate-workflows": "tsx src/cli/index.ts generate-workflows",
+    "db:seed": "tsx prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.0.0",

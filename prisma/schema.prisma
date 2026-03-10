@@ -159,6 +159,8 @@ model Organization {
   trackedCreators      TrackedCreator[]
   sourceVideos         SourceVideo[]
   postRecords          PostRecord[]
+  rssFeeds             RssFeed[]
+  trackedHashtags      TrackedHashtag[]
 }
 
 // ── Multi-Tenant: Membership ─────────────────────────────────────
@@ -469,4 +471,61 @@ model ProxyAllocation {
 
   @@index([status])
   @@index([assignedAccountId])
+}
+
+// ── RSS Feeds ───────────────────────────────────────────────────
+
+model RssFeed {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   // human-readable label ("ESPN NBA", "Bleacher Report")
+  url            String   // RSS feed URL
+  isActive       Boolean  @default(true)
+  lastFetchedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  articles     RssArticle[]
+
+  @@unique([organizationId, url])
+  @@index([organizationId])
+  @@index([isActive])
+}
+
+model RssArticle {
+  id             String    @id @default(cuid())
+  feedId         String
+  organizationId String
+  title          String
+  url            String    @unique // dedup by article URL
+  summary        String?   @db.Text
+  author         String?
+  publishedAt    DateTime?
+  fetchedAt      DateTime  @default(now())
+
+  feed RssFeed @relation(fields: [feedId], references: [id], onDelete: Cascade)
+
+  @@index([feedId])
+  @@index([organizationId])
+  @@index([publishedAt])
+}
+
+// ── Tracked Hashtags ────────────────────────────────────────────
+
+model TrackedHashtag {
+  id             String   @id @default(cuid())
+  organizationId String
+  platform       Platform
+  tag            String   // without '#' prefix, e.g. "basketball"
+  isActive       Boolean  @default(true)
+  lastPolledAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, platform, tag])
+  @@index([organizationId])
+  @@index([isActive])
 }
