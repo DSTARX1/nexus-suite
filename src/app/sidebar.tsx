@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
+  { href: "/analytics", label: "Analytics" },
   { href: "/workflows", label: "Workflows" },
   { href: "/agents", label: "Agents" },
   { href: "/competitors", label: "Competitors" },
@@ -12,7 +13,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings" },
 ];
 
-const PROTECTED_PREFIXES = ["/dashboard", "/competitors", "/multiplier", "/workflows", "/agents", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/analytics", "/competitors", "/multiplier", "/workflows", "/agents", "/settings"];
 
 export function Sidebar() {
   const pathname = usePathname();

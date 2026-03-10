@@ -1,5 +1,6 @@
 import { createTRPCRouter } from "./trpc";
 import { adminRouter } from "./routers/admin";
+import { analyticsRouter } from "./routers/analytics";
 import { competitorsRouter } from "./routers/competitors";
 import { multiplierRouter } from "./routers/multiplier";
 import { onboardingRouter } from "./routers/onboarding";
@@ -13,6 +14,7 @@ import { rssRouter } from "./routers/rss";
 
 export const appRouter = createTRPCRouter({
   admin: adminRouter,
+  analytics: analyticsRouter,
   competitors: competitorsRouter,
   multiplier: multiplierRouter,
   onboarding: onboardingRouter,

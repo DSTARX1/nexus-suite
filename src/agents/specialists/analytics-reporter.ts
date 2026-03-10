@@ -6,6 +6,7 @@ import { modelConfig } from "@/agents/platforms/model-config";
 import { prepareContext } from "../general/prepare-context";
 import { buildSystemPrompt } from "../general/prompts";
 import type { RawAgentContext } from "../general/types";
+import { db } from "@/lib/db";
 
 const AGENT_NAME = "analytics-reporter";
 
@@ -27,6 +28,18 @@ Return JSON with:
 - "top_content": best performing content in period
 - "recommendations": array of actionable next steps`;
 
+function parsePeriodDays(period: string): number {
+  const match = period.match(/^(\d+)d$/);
+  return match ? parseInt(match[1], 10) : 30;
+}
+
+function daysAgo(days: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
 const queryAnalytics = createTool({
   id: "queryAnalytics",
   description: "Fetch engagement, reach, and follower data by platform and time period",
@@ -38,13 +51,88 @@ const queryAnalytics = createTool({
   execute: async (executionContext) => {
     const { platform, period, metrics } = executionContext.context;
     const wrappedFn = wrapToolHandler(
-      async (input: { platform: string; period?: string; metrics?: string[] }) => ({
-        platform: input.platform,
-        period: input.period ?? "30d",
-        metrics: input.metrics ?? ["impressions", "engagement_rate", "reach"],
-        data: [] as Record<string, unknown>[],
-        status: "pending-integration" as const,
-      }),
+      async (input: { platform: string; period?: string; metrics?: string[] }) => {
+        const days = parsePeriodDays(input.period ?? "30d");
+        const since = daysAgo(days);
+        const platformUpper = input.platform.toUpperCase();
+
+        // Query own post records for this platform
+        const postGroups = await db.postRecord.groupBy({
+          by: ["status"],
+          where: {
+            platform: platformUpper as never,
+            createdAt: { gte: since },
+          },
+          _count: true,
+        });
+
+        let totalPosts = 0;
+        let successPosts = 0;
+        for (const g of postGroups) {
+          totalPosts += g._count;
+          if (g.status === "SUCCESS") successPosts = g._count;
+        }
+
+        // Query tracked competitor posts for this platform
+        const trackedAgg = await db.trackedPost.aggregate({
+          where: {
+            creator: { platform: platformUpper as never },
+            createdAt: { gte: since },
+          },
+          _sum: { views: true, likes: true, comments: true },
+          _count: true,
+          _avg: { views: true, likes: true },
+        });
+
+        // Snapshot trend — compare first half vs second half of period
+        const midpoint = daysAgo(Math.floor(days / 2));
+        const [firstHalf, secondHalf] = await Promise.all([
+          db.postSnapshot.aggregate({
+            where: {
+              capturedAt: { gte: since, lt: midpoint },
+              post: { creator: { platform: platformUpper as never } },
+            },
+            _avg: { views: true, likes: true },
+            _count: true,
+          }),
+          db.postSnapshot.aggregate({
+            where: {
+              capturedAt: { gte: midpoint },
+              post: { creator: { platform: platformUpper as never } },
+            },
+            _avg: { views: true, likes: true },
+            _count: true,
+          }),
+        ]);
+
+        const viewsTrend =
+          firstHalf._avg.views && secondHalf._avg.views
+            ? ((secondHalf._avg.views - firstHalf._avg.views) / firstHalf._avg.views) * 100
+            : 0;
+
+        const requestedMetrics = input.metrics ?? ["impressions", "engagement_rate", "reach"];
+
+        return {
+          platform: input.platform,
+          period: input.period ?? "30d",
+          metrics: requestedMetrics,
+          data: {
+            ownPosts: { total: totalPosts, successful: successPosts },
+            trackedPosts: {
+              count: trackedAgg._count,
+              totalViews: trackedAgg._sum.views ?? 0,
+              totalLikes: trackedAgg._sum.likes ?? 0,
+              totalComments: trackedAgg._sum.comments ?? 0,
+              avgViews: Math.round(trackedAgg._avg.views ?? 0),
+              avgLikes: Math.round(trackedAgg._avg.likes ?? 0),
+            },
+            trends: {
+              viewsChange: Math.round(viewsTrend * 10) / 10,
+              direction: viewsTrend > 5 ? "up" : viewsTrend < -5 ? "down" : "stable",
+            },
+          },
+        };
+      },
       { agentName: AGENT_NAME, toolName: "queryAnalytics" },
     );
     return wrappedFn({ platform, period, metrics });
