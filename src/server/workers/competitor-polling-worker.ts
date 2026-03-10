@@ -1,5 +1,11 @@
 import PgBoss from "pg-boss";
-import { db } from "@/lib/db";
+import { db } from "@/lib/db.js";
+import {
+  getUserByUsername,
+  getUserTimeline,
+  getRateUsage,
+  type XTweet,
+} from "@/lib/x-api.js";
 
 // ── Config ───────────────────────────────────────────────────
 
@@ -228,6 +234,127 @@ async function pollCreator(
   );
 }
 
+// ── X API polling (faster path for X-platform creators) ─────
+
+async function pollCreatorViaXApi(
+  pgBoss: PgBoss,
+  creator: {
+    id: string;
+    organizationId: string;
+    profileUrl: string;
+    platform: string;
+    outlierThreshold: number;
+    autoReproduce: boolean;
+  },
+): Promise<boolean> {
+  const bearerToken = process.env.X_BEARER_TOKEN;
+  if (!bearerToken) return false;
+
+  // Check rate budget — don't use X API if running low
+  const { used, limit } = await getRateUsage();
+  if (used + 15 > limit) {
+    console.log("[competitor-poll] X API rate budget low, falling back to scraper");
+    return false;
+  }
+
+  // Extract username from profile URL (e.g. https://x.com/AdamSchefter)
+  const usernameMatch = creator.profileUrl.match(
+    /(?:twitter\.com|x\.com)\/([A-Za-z0-9_]+)/,
+  );
+  if (!usernameMatch) return false;
+  const username = usernameMatch[1];
+
+  try {
+    // Resolve user ID
+    const userResp = await getUserByUsername(bearerToken, username);
+    if (!userResp.data) {
+      console.warn(`[competitor-poll] X user not found: ${username}`);
+      return false;
+    }
+
+    const userId = userResp.data.id;
+    const timeline = await getUserTimeline(bearerToken, userId, 10);
+
+    if (!timeline.data || timeline.data.length === 0) {
+      console.log(`[competitor-poll] X API returned 0 tweets for ${username}`);
+      // Still mark as polled
+      await db.trackedCreator.update({
+        where: { id: creator.id },
+        data: { lastPolledAt: new Date() },
+      });
+      return true;
+    }
+
+    const upsertedPostIds: string[] = [];
+
+    for (const tweet of timeline.data as XTweet[]) {
+      const views = tweet.public_metrics?.impression_count ?? 0;
+      const likes = tweet.public_metrics?.like_count ?? 0;
+      const comments = tweet.public_metrics?.reply_count ?? 0;
+
+      const post = await db.trackedPost.upsert({
+        where: {
+          creatorId_externalId: {
+            creatorId: creator.id,
+            externalId: tweet.id,
+          },
+        },
+        create: {
+          creatorId: creator.id,
+          externalId: tweet.id,
+          title: tweet.text.slice(0, 200),
+          url: `https://x.com/${username}/status/${tweet.id}`,
+          views,
+          likes,
+          comments,
+        },
+        update: {
+          title: tweet.text.slice(0, 200),
+          views,
+          likes,
+          comments,
+        },
+      });
+
+      await db.postSnapshot.create({
+        data: {
+          postId: post.id,
+          views,
+          likes,
+          comments,
+        },
+      });
+
+      upsertedPostIds.push(post.id);
+    }
+
+    await detectOutliers(
+      pgBoss,
+      creator.id,
+      creator.organizationId,
+      creator.outlierThreshold,
+      creator.autoReproduce,
+      upsertedPostIds,
+    );
+
+    await db.trackedCreator.update({
+      where: { id: creator.id },
+      data: { lastPolledAt: new Date() },
+    });
+
+    console.log(
+      `[competitor-poll] polled creator=${creator.id} via X API posts=${timeline.data.length}`,
+    );
+    return true;
+  } catch (err) {
+    console.warn(
+      `[competitor-poll] X API failed for creator=${creator.id}, falling back to scraper:`,
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
+}
+
 async function handlePollCron(): Promise<void> {
   const now = new Date();
   const b = await getBoss();
@@ -268,6 +395,12 @@ async function handlePollCron(): Promise<void> {
 
   for (const creator of due) {
     try {
+      // For X-platform creators, try the faster X API path first
+      if (creator.platform === "X") {
+        const handled = await pollCreatorViaXApi(b, creator);
+        if (handled) continue;
+        // Fall through to scraper if X API unavailable/failed
+      }
       await pollCreator(b, creator);
     } catch (err) {
       console.error(`[competitor-poll] error polling creator=${creator.id}:`, err);
