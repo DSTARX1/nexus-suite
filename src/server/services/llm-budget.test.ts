@@ -8,6 +8,9 @@ const redisMock = {
   get: vi.fn(),
   incrby: vi.fn(),
   ttl: vi.fn(),
+  publish: vi.fn(),
+  subscribe: vi.fn(),
+  on: vi.fn(),
 };
 
 vi.mock("ioredis", () => {
@@ -19,6 +22,9 @@ vi.mock("ioredis", () => {
       get = redisMock.get;
       incrby = redisMock.incrby;
       ttl = redisMock.ttl;
+      publish = redisMock.publish;
+      subscribe = redisMock.subscribe;
+      on = redisMock.on;
     },
   };
 });

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth";
 import { authConfig } from "@/server/auth/auth.config";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const { auth } = NextAuth(authConfig);
 
@@ -8,8 +8,9 @@ const { auth } = NextAuth(authConfig);
 const PUBLIC_ROUTES = ["/login", "/pricing", "/api/webhooks/stripe", "/api/auth", "/api/metrics", "/api/health"];
 
 export default auth((req) => {
-  const { pathname } = req.nextUrl;
-  const session = req.auth;
+  const nextReq = req as unknown as NextRequest & { auth: typeof req.auth };
+  const { pathname } = nextReq.nextUrl;
+  const session = nextReq.auth;
 
   // Allow public routes
   if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
@@ -18,7 +19,7 @@ export default auth((req) => {
 
   // No session → login
   if (!session?.user) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return NextResponse.redirect(new URL("/login", nextReq.url));
   }
 
   return NextResponse.next();
